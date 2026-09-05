@@ -54,12 +54,31 @@ function computeNextQuestion(session) {
     return advanceToNextGenericSection(session, sectionIdx);
   }
 
+  if (session.currentSection === 'ayush_dashavidha_pariksha') {
+    const q = nextAyushQuestion(session);
+    if (q) return q;
+    session.currentSection = 'done';
+    return null;
+  }
+
   // Generic single-question sections (past medical, surgical, drug/allergy, family, personal)
   if (['past_medical_history', 'past_surgical_history', 'drug_allergy_history', 'family_history', 'personal_history'].includes(session.currentSection)) {
     return advanceToNextGenericSection(session, sectionIdx);
   }
 
   return null; // interview complete
+}
+
+function nextAyushQuestion(session) {
+  const questions = qb.AYUSH_DASHAVIDHA_QUESTIONS;
+  if (!questions || session.ayushIndex >= questions.length) return null;
+  const q = questions[session.ayushIndex];
+  return {
+    section: 'ayush_dashavidha_pariksha',
+    field: q.field,
+    prompt: q.prompt,
+    options: q.options,
+  };
 }
 
 function nextHpiQuestion(session) {
@@ -83,6 +102,10 @@ function nextRosQuestion(session) {
 function advanceToNextGenericSection(session, currentIdx) {
   const nextIdx = currentIdx + 1;
   if (nextIdx >= SECTION_ORDER.length) {
+    if (session.department === 'AYUSH') {
+      session.currentSection = 'ayush_dashavidha_pariksha';
+      return nextAyushQuestion(session);
+    }
     session.currentSection = 'done';
     return null;
   }
@@ -107,6 +130,28 @@ function advanceToNextGenericSection(session, currentIdx) {
  */
 async function submitAnswer(session, currentQuestion, rawAnswerText) {
   session.transcript.push(rawAnswerText);
+
+  // If in AYUSH Dashavidha section, store patientReported answer directly and move to next AYUSH question
+  if (session.currentSection === 'ayush_dashavidha_pariksha') {
+    const field = currentQuestion.field;
+    if (session.schema.ayushAssessment && session.schema.ayushAssessment[field]) {
+      session.schema.ayushAssessment[field].patientReported = rawAnswerText;
+    }
+    session.ayushIndex = (session.ayushIndex || 0) + 1;
+    const nextQ = computeNextQuestion(session);
+
+    const detectedFlags = await llm.detectRedFlag({ transcript: session.transcript }).catch((err) => []);
+    const newlyTriggered = [];
+    for (const rf of (detectedFlags || [])) {
+      const alreadyKnown = session.schema.red_flags.some((existing) => existing.flag === rf.flag);
+      if (!alreadyKnown) {
+        const withTimestamp = { ...rf, timestamp: new Date().toISOString() };
+        session.schema.red_flags.push(withTimestamp);
+        newlyTriggered.push(withTimestamp);
+      }
+    }
+    return { nextQuestion: nextQ, redFlags: newlyTriggered, sessionComplete: nextQ === null };
+  }
 
   let nextQuestion = null;
   let dynamicProcessed = false;

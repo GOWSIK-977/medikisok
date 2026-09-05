@@ -14,7 +14,6 @@ export default function ReviewPage() {
   const [error, setError] = useState(null);
   const [done, setDone] = useState(false);
 
-  // Defined with useCallback so it can safely be listed in useEffect deps
   const loadSummary = useCallback(async (id) => {
     setLoading(true);
     setError(null);
@@ -53,7 +52,6 @@ export default function ReviewPage() {
     router.push("/kiosk");
   }
 
-  // Determine chief complaint text — handle multiple possible schema shapes
   const chiefComplaintText =
     summary?.chief_complaint?.text ||
     summary?.chief_complaint?.description ||

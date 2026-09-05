@@ -8,12 +8,14 @@
 
 const mockOcrProvider = require('./mockOcrProvider');
 const tesseractProvider = require('./tesseractProvider');
+const geminiVisionProvider = require('./geminiVisionProvider');
 
 const PROVIDER = (process.env.OCR_PROVIDER || 'mock').toLowerCase();
 
 const providers = {
   mock: mockOcrProvider,
   tesseract: tesseractProvider,
+  gemini: geminiVisionProvider,
 };
 
 if (!providers[PROVIDER]) {

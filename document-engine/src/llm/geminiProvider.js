@@ -69,8 +69,8 @@ function cleanAndParseJSON(text) {
  * Generate a cohesive clinical summary paragraph using Gemini.
  * MUST NOT INVENT ANY INFORMATION.
  */
-async function generateSummaryText({ clinicalHistory, documents, language = 'en' }) {
-  const fallbackSummary = require('./mockProvider').generateSummaryText({ clinicalHistory, documents });
+async function generateSummaryText({ clinicalHistory, documents, language = 'en', documentAlerts = [] }) {
+  const fallbackSummary = require('./mockProvider').generateSummaryText({ clinicalHistory, documents, documentAlerts });
 
   if (!ai) {
     const fallbackResult = await fallbackSummary;
@@ -82,8 +82,8 @@ async function generateSummaryText({ clinicalHistory, documents, language = 'en'
     if (language === 'hi') langName = 'Hindi (हिंदी)';
     if (language === 'ta') langName = 'Tamil (தமிழ்)';
 
-    const prompt = `You are an expert clinical documentation AI assistant.
-Synthesize a concise, professional clinical history summary for a physician's EMR record based ONLY on the provided structured intake and extracted medical documents.
+    const prompt = `You are an expert clinical documentation AI assistant at a hospital General Medicine OPD.
+Synthesize a concise, professional EMR record summary based ONLY on the provided intake history and extracted medical documents.
 
 Clinical Intake History:
 ${JSON.stringify(clinicalHistory, null, 2)}
@@ -91,15 +91,51 @@ ${JSON.stringify(clinicalHistory, null, 2)}
 Extracted Documents:
 ${JSON.stringify(documents, null, 2)}
 
+Document Safety Alerts:
+${JSON.stringify(documentAlerts, null, 2)}
+
 Target Language: ${langName}
 
-CRITICAL RULES:
-1. Include ONLY facts explicitly present in the clinical intake history or extracted documents.
+CRITICAL CLINICAL SAFETY RULES:
+1. Include ONLY facts explicitly present in the clinical intake history or matched extracted documents.
 2. DO NOT invent diagnoses, symptoms, medications, or lab values.
-3. Highlight any emergency RED FLAGS clearly at the end.
-4. DO NOT diagnose the patient. Write in factual clinical tone ("Patient reports...", "Prior prescription indicates...").
+3. IF A DOCUMENT IS FLAGGED AS A MISMATCH (e.g. prescription belongs to another patient name like Ramesh Kumar while patient is ${clinicalHistory?.patient?.name || 'Navaneethan R S'}), DO NOT incorporate its diagnoses or medications into the patient's Past Medical History or Medications list.
+4. Format the output cleanly under standard GENERAL MEDICINE OPD headers:
 
-Return ONLY the plain text clinical summary.`;
+GENERAL MEDICINE OPD
+
+Patient: <Name>
+Age: <Age>
+Gender: <Gender>
+
+Chief Complaint:
+<Chief Complaint>
+
+HPI:
+• Severity: <Severity>
+• Associated symptoms: <Symptoms>
+• Location: <Location or "Not specified">
+• Character: <Character or "Not specified">
+• Radiation: <Radiation or "Not specified">
+• Aggravating factors: <Factors or "Not specified">
+• Relieving factors: <Factors or "Not specified">
+
+Past Medical History:
+• <History or "No history reported">
+
+Allergies:
+• <Allergies or "No known allergies reported">
+
+Medications:
+• <Medications or "None reported">
+
+Red Flags:
+• <Red Flags or "None detected">
+
+DOCUMENT ALERT:
+<If any mismatched document exists, state: "⚠️ Uploaded [type] belongs to another patient ([Name], [Age]). Not incorporated into the patient's history.">
+
+Return ONLY the plain text clinical summary in this exact format.`;
 
     const response = await generateContentWithRetry(prompt);
     if (response?.text && response.text.trim()) {

@@ -28,12 +28,21 @@ async function request(url, options = {}) {
   return body;
 }
 
+// ---- ABHA Validation ----
+
+export function validateAbha(input) {
+  return request("/api/validate-abha", {
+    method: "POST",
+    body: JSON.stringify({ input }),
+  });
+}
+
 // ---- Person 1: Conversation Engine ----
 
-export function startSession({ name, age, gender, language }) {
+export function startSession({ name, age, gender, language, department = "GENERAL_MEDICINE" }) {
   return request(`${CONVO}/api/session/start`, {
     method: "POST",
-    body: JSON.stringify({ name, age, gender, language }),
+    body: JSON.stringify({ name, age, gender, language, department }),
   });
 }
 

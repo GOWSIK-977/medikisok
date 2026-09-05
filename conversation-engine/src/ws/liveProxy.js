@@ -44,20 +44,20 @@ function setupLiveProxy(wss) {
 
     let langInstruction = '';
     if (patientLang.startsWith('hi')) {
-      langInstruction = `The patient selected Hindi. You MUST conduct the entire clinical intake interview naturally in spoken Hindi.
+      langInstruction = `The patient selected Hindi. Conduct the entire clinical intake interview naturally in spoken Hindi.
 Begin the conversation immediately by speaking a warm opening question in Hindi: "नमस्ते! मैं आपका एआई मेडिकल सहायक हूँ। आज आपको क्या स्वास्थ्य समस्या है?"
-Understand spoken Hindi and respond ONLY in natural spoken Hindi. Do NOT use English under any circumstances. Every response from you MUST be entirely in Hindi (using Devanagari script).`;
+Understand spoken Hindi and respond ONLY in natural spoken Hindi.`;
     } else if (patientLang.startsWith('ta')) {
-      langInstruction = `The patient selected Tamil. You MUST conduct the entire clinical intake interview naturally in spoken Tamil.
+      langInstruction = `The patient selected Tamil. Conduct the entire clinical intake interview naturally in spoken Tamil.
 Begin the conversation immediately by speaking a warm opening question in Tamil: "வணக்கம்! நான் உங்கள் ஏஐ மருத்துவ உதவியாளர். இன்று உங்களுக்கு என்ன ஆரோக்கியப் பிரச்சினை உள்ளது?"
-Understand spoken Tamil and respond ONLY in natural spoken Tamil. Do NOT use English under any circumstances. Every response from you MUST be entirely in Tamil (using Tamil script).`;
+Understand spoken Tamil and respond ONLY in natural spoken Tamil.`;
     } else {
       langInstruction = `The patient selected English. Conduct the entire clinical intake interview naturally in spoken English.
 Begin the conversation immediately by speaking a warm opening question in English: "Hello! I am your AI clinical assistant. What health problem brought you in today?"
 Understand spoken English and respond in natural spoken English.`;
     }
 
-    const systemInstructionText = `You are MediKiosk AI, an empathetic, conversational medical voice assistant (like Google Assistant for hospital patient intake).
+    const systemInstructionText = `You are MediKiosk AI, an empathetic, conversational medical voice assistant (for hospital patient intake).
 
 ${langInstruction}
 
@@ -126,11 +126,12 @@ ${langInstruction}
         if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
           endOfSpeechTime = Date.now();
           console.log(`[LATENCY TRACK] Sent initial turn trigger to Gemini Live at ${endOfSpeechTime}`);
-          let triggerText = 'Hello, please start the patient intake now.';
+
+          let initText = 'Hello, please start the patient intake interview now.';
           if (patientLang.startsWith('hi')) {
-            triggerText = 'नमस्ते! रोगी का विवरण लेना शुरू करें।';
+            initText = 'नमस्ते, कृपया मरीज का स्वास्थ्य साक्षात्कार शुरू करें।';
           } else if (patientLang.startsWith('ta')) {
-            triggerText = 'வணக்கம்! நோயாளி விவரங்களைச் சேகரிக்கத் தொடங்குங்கள்.';
+            initText = 'வணக்கம், நோயாளிக்கான கேள்விகளைத் தொடங்குங்கள்.';
           }
 
           const initialTriggerFrame = {
@@ -138,7 +139,7 @@ ${langInstruction}
               turns: [
                 {
                   role: 'user',
-                  parts: [{ text: triggerText }]
+                  parts: [{ text: initText }]
                 }
               ],
               turnComplete: true

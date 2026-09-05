@@ -7,13 +7,13 @@ const router = express.Router();
 // POST /api/session/start
 // body: { name, age, gender, language }
 router.post('/start', (req, res) => {
-  const { name, age, gender, language } = req.body || {};
+  const { name, age, gender, language, department } = req.body || {};
   if (!name || !age || !gender || !language) {
     return res.status(400).json({ error: 'name, age, gender, and language are required' });
   }
 
-  const session = store.createSession({ name, age, gender, language });
-  const question = stateMachine.firstQuestion();
+  const session = store.createSession({ name, age, gender, language, department: department || 'GENERAL_MEDICINE' });
+  const question = stateMachine.firstQuestion(session);
   session.pendingQuestion = question;
 
   return res.json({ sessionId: session.id, question });
@@ -48,36 +48,36 @@ router.post('/:id/answer', async (req, res) => {
 // POST /api/session/:id/finalize
 // Finalizes the intake session, extracts all structured clinical data from the transcript,
 // and marks the session ready for document merge.
-router.post('/:id/finalize', async (req, res) => {
+router.post('/:id/finalize', (req, res) => {
   try {
     const session = store.getSession(req.params.id);
     session.currentSection = 'done';
 
+    // Trigger structured transcript extraction asynchronously in background
     if (session.transcript && session.transcript.length > 0) {
       const llm = require('../llm');
       if (typeof llm.extractFullTranscript === 'function') {
-        const extracted = await llm.extractFullTranscript({
+        llm.extractFullTranscript({
           transcript: session.transcript,
           schema: session.schema,
+        }).then((extracted) => {
+          if (extracted) {
+            if (extracted.chief_complaint && !session.schema.chief_complaint.text) {
+              session.schema.chief_complaint.text = extracted.chief_complaint;
+              session.schema.chief_complaint.text_en = extracted.chief_complaint;
+            }
+            if (extracted.hpi) {
+              session.schema.hpi = { ...session.schema.hpi, ...extracted.hpi };
+            }
+            if (extracted.past_medical_history) session.schema.past_medical_history_raw = extracted.past_medical_history;
+            if (extracted.past_surgical_history) session.schema.past_surgical_history_raw = extracted.past_surgical_history;
+            if (extracted.drug_allergy_history) session.schema.drug_allergy_history_raw = extracted.drug_allergy_history;
+            if (extracted.family_history) session.schema.family_history_raw = extracted.family_history;
+            if (extracted.personal_history) session.schema.personal_history_raw = extracted.personal_history;
+          }
         }).catch((err) => {
-          console.warn('[session finalize] Extraction error:', err.message);
-          return null;
+          console.warn('[session finalize] Background extraction error:', err.message);
         });
-
-        if (extracted) {
-          if (extracted.chief_complaint && !session.schema.chief_complaint.text) {
-            session.schema.chief_complaint.text = extracted.chief_complaint;
-            session.schema.chief_complaint.text_en = extracted.chief_complaint;
-          }
-          if (extracted.hpi) {
-            session.schema.hpi = { ...session.schema.hpi, ...extracted.hpi };
-          }
-          if (extracted.past_medical_history) session.schema.past_medical_history_raw = extracted.past_medical_history;
-          if (extracted.past_surgical_history) session.schema.past_surgical_history_raw = extracted.past_surgical_history;
-          if (extracted.drug_allergy_history) session.schema.drug_allergy_history_raw = extracted.drug_allergy_history;
-          if (extracted.family_history) session.schema.family_history_raw = extracted.family_history;
-          if (extracted.personal_history) session.schema.personal_history_raw = extracted.personal_history;
-        }
       }
     }
 

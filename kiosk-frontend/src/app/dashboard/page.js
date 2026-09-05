@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getQueue } from "@/lib/registry";
+import { getQueue, clearQueueKeepLast5 } from "@/lib/registry";
 
 const STATUS_LABEL = {
   in_progress: "Interview in progress",
@@ -24,7 +24,11 @@ export default function DashboardPage() {
   const [queue, setQueue] = useState([]);
 
   function refresh() {
-    setQueue(getQueue());
+    setQueue(getQueue().slice(0, 5));
+  }
+
+  function handleTrimQueue() {
+    setQueue(clearQueueKeepLast5());
   }
 
   useEffect(() => {
@@ -38,11 +42,16 @@ export default function DashboardPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 24 }}>
         <div>
           <p className="eyebrow">Doctor dashboard</p>
-          <h1 style={{ fontSize: 30, marginTop: 6 }}>Patient queue</h1>
+          <h1 style={{ fontSize: 30, marginTop: 6 }}>Patient queue (Recent 5)</h1>
         </div>
-        <button className="btn btn-secondary btn-sm" onClick={refresh}>
-          Refresh
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button className="btn btn-secondary btn-sm" onClick={handleTrimQueue}>
+            🧹 Keep Last 5 Records
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={refresh}>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {queue.length === 0 && (

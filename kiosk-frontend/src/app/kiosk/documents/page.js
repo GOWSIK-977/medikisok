@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { uploadDocument } from "@/lib/api";
 import { loadActiveSession, upsertQueueEntry } from "@/lib/registry";
@@ -11,63 +11,55 @@ const DOC_TYPES = [
   { value: "discharge_summary", label: "Discharge summary" },
 ];
 
-// 1x1 transparent PNG — lets the demo proceed even without a real
-// scanned file on hand. The mock OCR provider returns canned text
-// keyed to documentType regardless of image content.
 const PLACEHOLDER_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORUS5CYII=";
 
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(",")[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-      return;
-    }
-
+function fileToCompressedBase64(file, maxDimension = 1200, quality = 0.8) {
+  return new Promise((resolve) => {
+    if (!file) return resolve(PLACEHOLDER_BASE64);
     const reader = new FileReader();
     reader.onload = (e) => {
+      const dataUrl = e.target.result || "";
+      const rawBase64 = dataUrl.includes(",") ? dataUrl.split(",")[1] : dataUrl;
+      if (!file.type || !file.type.startsWith("image/")) {
+        return resolve(rawBase64);
+      }
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
+        try {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
           }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressedDataUrl.split(",")[1] || rawBase64);
+        } catch (_) {
+          resolve(rawBase64);
         }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Compress to JPEG with 0.75 quality to reduce upload payload size significantly while preserving text readability
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
-        resolve(dataUrl.split(",")[1]);
       };
-      img.onerror = reject;
-      img.src = e.target.result;
+      img.onerror = () => resolve(rawBase64);
+      img.src = dataUrl;
     };
-    reader.onerror = reject;
+    reader.onerror = () => resolve(PLACEHOLDER_BASE64);
     reader.readAsDataURL(file);
   });
 }
 
 export default function DocumentsPage() {
   const router = useRouter();
+  const fileInputRef = useRef(null);
   const [sessionId, setSessionId] = useState(null);
   const [documentType, setDocumentType] = useState("prescription");
   const [file, setFile] = useState(null);
@@ -88,10 +80,11 @@ export default function DocumentsPage() {
     setError(null);
     setUploading(true);
     try {
-      const imageBase64 = useDemoFile || !file ? PLACEHOLDER_BASE64 : await fileToBase64(file);
+      const imageBase64 = useDemoFile || !file ? PLACEHOLDER_BASE64 : await fileToCompressedBase64(file);
       const result = await uploadDocument(sessionId, documentType, imageBase64);
       setUploaded((prev) => [...prev, { documentType, result }]);
       setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       setError(err.message);
     } finally {
@@ -126,7 +119,13 @@ export default function DocumentsPage() {
 
         <div className="field">
           <label htmlFor="file">Photo / scan</label>
-          <input id="file" type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          <input
+            ref={fileInputRef}
+            id="file"
+            type="file"
+            accept="image/*,.pdf,application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>

@@ -69,6 +69,60 @@ const HISTORY_SECTIONS = {
   personal_history: ['Could you tell me about your diet, and whether you smoke or drink alcohol?'],
 };
 
+// AYUSH OPD - Dashavidha Pariksha (10-fold clinical examination)
+const AYUSH_DASHAVIDHA_QUESTIONS = [
+  {
+    field: 'prakriti',
+    prompt: 'AYUSH Assessment (1/10) - Prakriti: What is your predominant natural body constitution?',
+    options: ['Vata', 'Pitta', 'Kapha', 'Vata-Pitta', 'Pitta-Kapha', 'Vata-Kapha', 'Tridoshaja'],
+  },
+  {
+    field: 'vikriti',
+    prompt: 'AYUSH Assessment (2/10) - Vikriti: Which Dosha imbalance or aggravation do you currently feel?',
+    options: ['Vata Dushti', 'Pitta Dushti', 'Kapha Dushti', 'Tridosha Dushti', 'No Aggravation'],
+  },
+  {
+    field: 'sara',
+    prompt: 'AYUSH Assessment (3/10) - Sara: How would you rate your overall tissue excellence and vitality?',
+    options: ['Pravara (Excellent)', 'Madhyama (Moderate)', 'Avara (Poor)'],
+  },
+  {
+    field: 'samhanana',
+    prompt: 'AYUSH Assessment (4/10) - Samhanana: How would you describe your physical compactness and body build?',
+    options: ['Su-samhanata (Well-built)', 'Madhyama (Medium)', 'Heena (Frail)'],
+  },
+  {
+    field: 'pramana',
+    prompt: 'AYUSH Assessment (5/10) - Pramana: Are your body proportions and height-weight ratio balanced?',
+    options: ['Pramana-yukta (Proportionate)', 'Ati-sthula (Overweight)', 'Ati-krisha (Underweight)'],
+  },
+  {
+    field: 'satmya',
+    prompt: 'AYUSH Assessment (6/10) - Satmya: How adaptable is your body to different foods, water, and climates?',
+    options: ['Sarva-satmya (Adaptable to all)', 'Eka-satmya (Limited adaptability)', 'Madhyama-satmya'],
+  },
+  {
+    field: 'sattva',
+    prompt: 'AYUSH Assessment (7/10) - Sattva: How would you describe your mental strength and emotional resilience?',
+    options: ['Pravara-sattva (High resilience)', 'Madhyama-sattva (Moderate)', 'Avara-sattva (Low/Sensitive)'],
+  },
+  {
+    field: 'ahara_shakti',
+    prompt: 'AYUSH Assessment (8/10) - Ahara Shakti: How is your appetite and digestive power (Agni)?',
+    options: ['Uttama Agni (Strong Agni)', 'Madhyama Agni (Moderate)', 'Manda Agni (Weak Agni)'],
+  },
+  {
+    field: 'vyayama_shakti',
+    prompt: 'AYUSH Assessment (9/10) - Vyayama Shakti: How is your physical exercise capacity and stamina?',
+    options: ['Uttama (High stamina)', 'Madhyama (Moderate)', 'Avara (Low stamina)'],
+  },
+  {
+    field: 'vaya',
+    prompt: 'AYUSH Assessment (10/10) - Vaya: Which age stage category applies to you?',
+    options: ['Bala (Childhood)', 'Madhya (Adult/Youth)', 'Vriddha (Elderly)'],
+  },
+];
+
 module.exports = {
   SOCRATES_TEMPLATES,
   COMPLAINT_FLOWS,
@@ -76,4 +130,5 @@ module.exports = {
   getHpiFieldOrder,
   ROS_QUESTIONS,
   HISTORY_SECTIONS,
+  AYUSH_DASHAVIDHA_QUESTIONS,
 };

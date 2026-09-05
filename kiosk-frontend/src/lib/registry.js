@@ -48,6 +48,14 @@ export function getQueueEntry(sessionId) {
   return readAll().find((r) => r.sessionId === sessionId) || null;
 }
 
+export function clearQueueKeepLast5() {
+  const rows = readAll();
+  const sorted = [...rows].sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+  const trimmed = sorted.slice(0, 5);
+  writeAll(trimmed);
+  return getQueue();
+}
+
 // ---- Active kiosk session (the patient currently at the kiosk) ----
 
 const SESSION_KEY = "medikiosk_active_session_v1";

@@ -35,6 +35,7 @@ export default function LiveInterviewPage() {
   const lastSpokenTextRef = useRef("");
   const completeRef = useRef(false); // mirror of `complete` state for stable closures
   const sessionIdRef = useRef(null);
+  const micStoppedRef = useRef(false);
 
   // ─── Audio: Interrupt Playback ───────────────────────────────────────────────
   const interruptPlayback = useCallback(() => {
@@ -55,14 +56,26 @@ export default function LiveInterviewPage() {
     setTimeout(() => setLiveState("LISTENING"), 300);
   }, []);
 
+  // ─── Audio: Ensure Active AudioContext ───────────────────────────────────────
+  const ensureAudioContext = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+      audioCtxRef.current = new AudioCtx();
+    }
+    const ctx = audioCtxRef.current;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    return ctx;
+  }, []);
+
   // ─── Audio: Stop Microphone (stable, does not close AudioCtx) ────────────────
   const stopLiveMicrophone = useCallback(() => {
+    micStoppedRef.current = true;
     if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
     if (speechRecRef.current) {
-      try {
-        speechRecRef.current.onend = null; // Prevent restart on end
-        speechRecRef.current.stop();
-      } catch (_) {}
+      try { speechRecRef.current.stop(); } catch (_) {}
       speechRecRef.current = null;
     }
     if (processorRef.current) {
@@ -88,12 +101,8 @@ export default function LiveInterviewPage() {
       const float32 = new Float32Array(pcm16.length);
       for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768.0;
 
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-        audioCtxRef.current = new AudioCtx();
-      }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === "suspended") ctx.resume();
+      const ctx = ensureAudioContext();
+      if (!ctx) return;
 
       const buf = ctx.createBuffer(1, float32.length, sampleRate);
       buf.getChannelData(0).set(float32);
@@ -103,8 +112,8 @@ export default function LiveInterviewPage() {
       source.connect(ctx.destination);
 
       const now = ctx.currentTime;
-      // 60 ms lookahead keeps chunks seamlessly glued together
-      if (nextPlayTimeRef.current < now) nextPlayTimeRef.current = now + 0.06;
+      // Schedule playback smoothly without forced 60ms gap per chunk
+      nextPlayTimeRef.current = Math.max(now, nextPlayTimeRef.current);
       source.start(nextPlayTimeRef.current);
       nextPlayTimeRef.current += buf.duration;
       activeSourcesRef.current.push(source);
@@ -122,12 +131,14 @@ export default function LiveInterviewPage() {
     } catch (err) {
       console.error("[Audio Playback Error]:", err);
     }
-  }, []);
+  }, [ensureAudioContext]);
 
   // ─── Submit patient turn → Gemini ────────────────────────────────────────────
   const commitPatientTurn = useCallback((text) => {
     const trimmed = (text || "").trim();
     if (!trimmed) return;
+
+    ensureAudioContext();
 
     // Only interrupt playback if AI is actually speaking
     if (isAiSpeakingRef.current) interruptPlayback();
@@ -141,7 +152,7 @@ export default function LiveInterviewPage() {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "user_text", text: trimmed }));
     }
-  }, [interruptPlayback]);
+  }, [interruptPlayback, ensureAudioContext]);
 
   // ─── Resample to 16kHz PCM ────────────────────────────────────────────────────
   const resampleTo16kPcm = useCallback((inputBuf, inputRate) => {
@@ -161,21 +172,25 @@ export default function LiveInterviewPage() {
   // ─── Start Microphone ─────────────────────────────────────────────────────────
   const startLiveMicrophone = useCallback(async () => {
     if (typeof window === "undefined") return;
-    
-    // Stop any existing mic streams/rec first to prevent duplicates/leaks
-    stopLiveMicrophone();
-
+    micStoppedRef.current = false;
     try {
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
+      if (speechRecRef.current) {
+        try { speechRecRef.current.stop(); } catch (_) {}
+        speechRecRef.current = null;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 16000 },
         video: false,
       });
       micStreamRef.current = stream;
 
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioCtx();
-      if (ctx.state === "suspended") await ctx.resume();
-      audioCtxRef.current = ctx;
+      const ctx = ensureAudioContext();
+      if (!ctx) return;
 
       const src = ctx.createMediaStreamSource(stream);
       const proc = ctx.createScriptProcessor(4096, 1, 1);
@@ -183,7 +198,7 @@ export default function LiveInterviewPage() {
 
       proc.onaudioprocess = (e) => {
         // Echo gate: skip sending mic audio while AI is speaking to prevent loopback
-        if (isAiSpeakingRef.current) return;
+        if (isAiSpeakingRef.current || micStoppedRef.current) return;
         const pcm = resampleTo16kPcm(e.inputBuffer.getChannelData(0), ctx.sampleRate);
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({ type: "audio_pcm_chunk", data: pcm }));
@@ -201,7 +216,7 @@ export default function LiveInterviewPage() {
         rec.lang = language.startsWith("hi") ? "hi-IN" : language.startsWith("ta") ? "ta-IN" : "en-IN";
 
         rec.onresult = (e) => {
-          if (isAiSpeakingRef.current) return; // ignore self-echo
+          if (isAiSpeakingRef.current || micStoppedRef.current) return; // ignore self-echo
 
           let interim = "";
           let final = "";
@@ -228,18 +243,22 @@ export default function LiveInterviewPage() {
             // Immediately commit finalised utterance
             commitPatientTurn(final.trim());
           } else {
-            // 700 ms silence → auto-submit
+            // 400 ms silence → fast turn submission
             speechTimerRef.current = setTimeout(() => {
               const pending = lastSpokenTextRef.current.trim();
               if (pending.length > 1) commitPatientTurn(pending);
-            }, 700);
+            }, 400);
           }
         };
 
-        rec.onerror = () => {};
+        rec.onerror = (e) => {
+          if (e.error === "no-speech" && !completeRef.current && !micStoppedRef.current) {
+            try { rec.start(); } catch (_) {}
+          }
+        };
         rec.onend = () => {
-          // Restart speech recognition automatically unless interview is done
-          if (!completeRef.current) {
+          // Restart speech recognition automatically unless stopped or complete
+          if (!completeRef.current && !micStoppedRef.current) {
             try { rec.start(); } catch (_) {}
           }
         };
@@ -255,7 +274,7 @@ export default function LiveInterviewPage() {
       setError("Microphone permission denied or not supported. You can still type below.");
       setLiveState("CONNECTED");
     }
-  }, [language, resampleTo16kPcm, commitPatientTurn]);
+  }, [language, resampleTo16kPcm, commitPatientTurn, ensureAudioContext]);
 
   // ─── WebSocket + Session Setup ────────────────────────────────────────────────
   useEffect(() => {
@@ -329,21 +348,14 @@ export default function LiveInterviewPage() {
     };
 
     ws.onerror = () => {
-      setError("WebSocket connection failed. You can still type below.");
       setLiveState("DISCONNECTED");
     };
 
     ws.onclose = () => setLiveState("DISCONNECTED");
 
     return () => {
-      completeRef.current = true; // Signal that interview is complete/unmounted
       ws.close();
       stopLiveMicrophone();
-      // Clean up AudioContext on unmount
-      if (audioCtxRef.current) {
-        try { audioCtxRef.current.close(); } catch (_) {}
-        audioCtxRef.current = null;
-      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
@@ -353,7 +365,7 @@ export default function LiveInterviewPage() {
   }, [messages, patientTranscript]);
 
   // ─── Finish Interview ─────────────────────────────────────────────────────────
-  const handleFinishInterview = useCallback(async () => {
+  const handleFinishInterview = useCallback(() => {
     if (isFinalizing) return;
     setIsFinalizing(true);
     completeRef.current = true;
@@ -365,15 +377,12 @@ export default function LiveInterviewPage() {
       try { wsRef.current.send(JSON.stringify({ type: "finish_interview" })); } catch (_) {}
     }
 
-    try {
-      const sId = sessionIdRef.current;
-      if (sId) {
-        await finalizeSession(sId);
-        saveActiveSession({ sessionComplete: true });
-        upsertQueueEntry(sId, { status: "interview_complete" });
-      }
-    } catch (err) {
-      console.warn("Finalize notice:", err.message);
+    const sId = sessionIdRef.current;
+    if (sId) {
+      saveActiveSession({ sessionComplete: true });
+      upsertQueueEntry(sId, { status: "interview_complete" });
+      // Non-blocking trigger so extraction completes in background while UI transitions instantly
+      finalizeSession(sId).catch((err) => console.warn("Finalize notice:", err.message));
     }
 
     router.push("/kiosk/documents");
@@ -392,7 +401,7 @@ export default function LiveInterviewPage() {
     <div>
       <p className="eyebrow">Step 4 of 6</p>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ fontSize: 30, marginTop: 8, marginBottom: 6 }}>Gemini Live AI Intake</h1>
+        <h1 style={{ fontSize: 30, marginTop: 8, marginBottom: 6 }}>Live AI Intake</h1>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {liveState === "CONNECTED" && (
             <span style={{ background: "#dcfce7", color: "#166534", padding: "6px 14px", borderRadius: 14, fontSize: 13, fontWeight: 600 }}>

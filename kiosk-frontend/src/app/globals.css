@@ -169,6 +169,12 @@ h3 {
   border: 1px solid #edcd97;
 }
 
+.banner-green {
+  background: #e6f4ea;
+  color: #137333;
+  border: 1px solid #a8dab5;
+}
+
 .tag {
   display: inline-flex;
   align-items: center;

@@ -89,8 +89,27 @@ function extractDocumentDate(text) {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
+// Matches lines like: "Patient: Ramesh Kumar, 52M" or "Patient Name: Ramesh Kumar, 52/M"
+const PATIENT_LINE_REGEX = /Patient(?:\s+Name)?:\s*([A-Za-z\s.]+?)(?:,\s*(\d{1,3})\s*([MFmf])|\s*$)/im;
+
+function extractDocumentPatient(text) {
+  for (const line of text.split('\n')) {
+    const match = line.trim().match(PATIENT_LINE_REGEX);
+    if (match) {
+      const name = match[1].trim();
+      const age = match[2] ? parseInt(match[2], 10) : null;
+      const gender = match[3] ? (match[3].toUpperCase() === 'M' ? 'Male' : 'Female') : null;
+      if (name && name.length > 2) {
+        return { name, age, gender };
+      }
+    }
+  }
+  return null;
+}
+
 function extractAll(rawText) {
   return {
+    extracted_patient: extractDocumentPatient(rawText),
     extracted_diagnoses: extractDiagnoses(rawText),
     extracted_medications: extractMedications(rawText),
     extracted_investigations: extractInvestigations(rawText),
@@ -98,4 +117,4 @@ function extractAll(rawText) {
   };
 }
 
-module.exports = { extractAll, extractDiagnoses, extractMedications, extractInvestigations, extractDocumentDate };
+module.exports = { extractAll, extractDiagnoses, extractMedications, extractInvestigations, extractDocumentDate, extractDocumentPatient };
