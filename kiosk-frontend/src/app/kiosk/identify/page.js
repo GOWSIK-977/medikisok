@@ -125,6 +125,7 @@ export default function IdentifyPage() {
         age: Number(age),
         gender,
         department,
+        language: active?.language || "en",
         abhaId: finalAbhaId,
         status: "in_progress",
         redFlags: [],

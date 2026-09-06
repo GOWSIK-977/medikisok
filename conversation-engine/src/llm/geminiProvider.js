@@ -15,7 +15,7 @@ if (apiKey) {
   console.warn('[geminiProvider] Warning: GEMINI_API_KEY is not set. Gemini calls will fall back gracefully.');
 }
 
-const MODEL_NAME = 'gemini-3.6-flash';
+const MODEL_NAME = 'gemini-2.0-flash';
 
 /**
  * Robust caller with exponential retry for temporary Google API 503 / 429 spikes.
@@ -271,12 +271,60 @@ Return ONLY a JSON object matching this exact schema:
  * Full Transcript Extraction
  * Takes the entire conversation transcript and generates comprehensive structured schema fields.
  */
-async function extractFullTranscript({ transcript, schema = {} }) {
+async function extractFullTranscript({ transcript, schema = {}, department = 'GENERAL_MEDICINE' }) {
   if (!ai || !transcript || transcript.length === 0) return null;
+
+  const isAyush = (schema?.department === 'AYUSH') || (department === 'AYUSH');
 
   try {
     const fullTranscript = transcript.join('\n');
-    const prompt = `You are an expert clinical summarizer at a hospital OPD kiosk.
+    const prompt = isAyush
+      ? `You are an expert clinical summarizer at an AYUSH hospital outpatient department (OPD).
+Review the full patient intake conversation transcript below:
+
+=== TRANSCRIPT ===
+${fullTranscript}
+
+=== CLINICAL SAFETY INSTRUCTIONS ===
+1. Extract all clinical information gathered during intake into structured JSON.
+2. DO NOT make definitive Dosha diagnoses (do NOT assert "Patient is Pitta Prakriti"). Instead, record the patient's reported physical characteristics, symptoms, digestion, bowels, sleep, build, etc. as observed indicators.
+3. Internally map the patient's natural responses to the AYUSH assessment categories.
+4. Return ONLY valid JSON matching this schema:
+{
+  "chief_complaint": "primary symptom or reason for visit (concise string)",
+  "hpi": {
+    "onset": "when it started or duration",
+    "location": "body location or null",
+    "character": "quality of symptom or null",
+    "severity": "mild / moderate / severe / rating or null",
+    "radiation": "radiation area or null",
+    "associated_symptoms": "associated symptoms or null",
+    "exacerbating_factors": "triggers or worsening factors or null",
+    "relieving_factors": "relieving factors or null"
+  },
+  "ayush_assessment": {
+    "prakriti": "reported thermal tolerance (cold/heat sensitivity) and skin type (dry/oily/normal)",
+    "vikriti": "current symptoms, recent physical changes and aggravations",
+    "agni": "reported hunger and digestion status (acidity, gas, bloating, heaviness)",
+    "koshtha": "reported stool and bowel habits (regular, hard/constipated, loose)",
+    "sara": "reported vitality, endurance and fatigue level",
+    "samhanana": "reported body build and compactness (slender, medium, broad frame)",
+    "pramana": "body frame and weight stability observations",
+    "satmya": "reported food habits, taste cravings, dietary suitability and intolerances",
+    "sattva": "reported stress coping, emotional temperament, and mental focus",
+    "ahara_shakti": "reported appetite and food intake capacity",
+    "vyayama_shakti": "reported physical exercise level and stamina",
+    "nidra": "reported sleep quality, duration, and morning waking freshness",
+    "vihara": "reported daily lifestyle, hydration, tea/coffee, smoking or alcohol habits",
+    "vaya": "age category"
+  },
+  "past_medical_history": "known chronic conditions (diabetes, hypertension, thyroid, etc.) or null",
+  "past_surgical_history": "past surgeries or null",
+  "drug_allergy_history": "known allergies to medicines or food or null",
+  "family_history": "family history or null",
+  "personal_history": "diet, lifestyle, hydration, and personal habits or null"
+}`
+      : `You are an expert clinical summarizer at a hospital OPD kiosk.
 Review the full patient intake conversation transcript below:
 
 === TRANSCRIPT ===
@@ -308,7 +356,7 @@ Return ONLY valid JSON matching this schema:
     const response = await generateContentWithRetry(prompt);
     if (response?.text) {
       const parsed = cleanAndParseJSON(response.text);
-      if (parsed && (parsed.chief_complaint || parsed.hpi)) {
+      if (parsed && (parsed.chief_complaint || parsed.hpi || parsed.ayush_assessment)) {
         return parsed;
       }
     }

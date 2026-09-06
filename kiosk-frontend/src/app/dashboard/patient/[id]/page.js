@@ -22,6 +22,79 @@ const SECTION_TITLES = {
   personal_history: { en: "Personal History", hi: "व्यक्तिगत इतिहास (Personal History)", ta: "தனிப்பட்ட வாழ்க்கை முறை வரலாறு" },
 };
 
+const AYUSH_FIELD_META = {
+  prakriti: {
+    label: "Body Nature & Thermal Traits",
+    sanskrit: "Deha Prakriti",
+    options: ["Vata Predominant", "Pitta Predominant", "Kapha Predominant", "Vata-Pitta", "Pitta-Kapha", "Vata-Kapha", "Tridoshaja"],
+  },
+  vikriti: {
+    label: "Current Symptoms & Aggravation",
+    sanskrit: "Vikriti / Dosha Dushti",
+    options: ["Vata Dushti", "Pitta Dushti", "Kapha Dushti", "Vata-Pitta Dushti", "Pitta-Kapha Dushti", "Tridosha Dushti", "No Severe Aggravation"],
+  },
+  agni: {
+    label: "Hunger, Digestion & Acidity",
+    sanskrit: "Agni Pariksha",
+    options: ["Samagni (Balanced)", "Tikshnagni (Hyperacidity/Sharp)", "Mandagni (Sluggish/Heavy)", "Vishamagni (Irregular/Bloating)"],
+  },
+  koshtha: {
+    label: "Stool & Bowel Evacuation",
+    sanskrit: "Koshtha Pariksha",
+    options: ["Madhyama Koshtha (Regular/Smooth)", "Krura Koshtha (Constipation/Hard)", "Mridu Koshtha (Loose/Frequent)"],
+  },
+  sara: {
+    label: "Tissue Excellence & Vitality",
+    sanskrit: "Sara Pariksha (Dhatu Sara)",
+    options: ["Pravara Sara (Excellent)", "Madhyama Sara (Moderate)", "Avara Sara (Suboptimal)"],
+  },
+  samhanana: {
+    label: "Compactness & Body Build",
+    sanskrit: "Samhanana Pariksha",
+    options: ["Su-samhanata (Well-compacted)", "Madhyama (Medium)", "Heena (Frail / Slender)"],
+  },
+  pramana: {
+    label: "Body Proportions & Weight Frame",
+    sanskrit: "Pramana Pariksha",
+    options: ["Pramana-yukta (Balanced)", "Ati-sthula (Overweight tendency)", "Ati-krisha (Underweight tendency)"],
+  },
+  satmya: {
+    label: "Dietary Adaptability & Habits",
+    sanskrit: "Satmya Pariksha",
+    options: ["Sarva-satmya (Adaptable to all foods)", "Madhyama-satmya (Moderate)", "Eka-satmya / Asatmya (Food intolerances)"],
+  },
+  sattva: {
+    label: "Mental Resilience & Emotions",
+    sanskrit: "Sattva Pariksha (Manasika)",
+    options: ["Pravara-sattva (High resilience/calm)", "Madhyama-sattva (Moderate)", "Avara-sattva (Sensitive / Anxious)"],
+  },
+  ahara_shakti: {
+    label: "Food Capacity & Appetite",
+    sanskrit: "Ahara Shakti (Abhyavaharana)",
+    options: ["Uttama Ahara Shakti", "Madhyama Ahara Shakti", "Avara Ahara Shakti"],
+  },
+  vyayama_shakti: {
+    label: "Physical Strength & Stamina",
+    sanskrit: "Vyayama Shakti (Bala)",
+    options: ["Uttama Bala (High stamina)", "Madhyama Bala (Moderate)", "Avara Bala (Low stamina / quick fatigue)"],
+  },
+  nidra: {
+    label: "Sleep Quality & Routine",
+    sanskrit: "Nidra Pariksha",
+    options: ["Samyak Nidra (Sound 7-8h)", "Alpanidra / Khandita (Broken/Light)", "Anidra (Insomnia)", "Atinidra (Excessive sleep)"],
+  },
+  vihara: {
+    label: "Daily Lifestyle & Habits",
+    sanskrit: "Vihara Pariksha",
+    options: ["Hita Vihara (Healthy routine)", "Ayukta Vihara (Irregular/Late)", "Sedentary"],
+  },
+  vaya: {
+    label: "Age Stage Category",
+    sanskrit: "Vaya Pariksha",
+    options: ["Bala (Childhood)", "Madhya (Adult/Youth)", "Vriddha (Elderly)"],
+  },
+};
+
 const FIELD_LABELS = {
   text: { en: "Text", hi: "विवरण", ta: "விவரம்" },
   text_en: { en: "Text (En)", hi: "विवरण (अंग्रेजी)", ta: "விவரம் (ஆங்கிலம்)" },
@@ -44,60 +117,132 @@ function translateTextLocally(text, lang) {
   if (!text || lang === "en") return text;
   if (lang === "hi") {
     return text
-      .replace(/GENERAL MEDICINE OPD/g, "सामान्य चिकित्सा ओपीडी")
-      .replace(/Patient:/g, "मरीज का नाम:")
+      .replace(/GENERAL MEDICINE CLINICAL OPD SUMMARY & TRIAGE REPORT/g, "सामान्य चिकित्सा क्लिनिकल ओपीडी सारांश और ट्राइएज रिपोर्ट")
+      .replace(/AYUSH CLINICAL OPD - ROGA ITIHASA & PARIKSHA REPORT/g, "आयुष क्लिनिकल ओपीडी - रोग इतिहास एवं परीक्षा रिपोर्ट")
+      .replace(/PATIENT DEMOGRAPHICS:/g, "मरीज का विवरण:")
+      .replace(/ROGI VIVARANA \(PATIENT DEMOGRAPHICS\):/g, "रोगी विवरण (मरीज की जनसांख्यिकी):")
+      .replace(/Rogi \(Patient Name\):/g, "रोगी का नाम:")
+      .replace(/Name:/g, "नाम:")
+      .replace(/Vaya \(Age\):/g, "वय (आयु):")
       .replace(/Age:/g, "आयु:")
+      .replace(/Linga \(Gender\):/g, "लिंग:")
       .replace(/Gender:/g, "लिंग:")
-      .replace(/Chief Complaint:/g, "मुख्य स्वास्थ्य समस्या (Chief Complaint):")
-      .replace(/HPI:/g, "वर्तमान बीमारी का इतिहास (HPI):")
+      .replace(/Department:/g, "विभाग:")
+      .replace(/CHIEF COMPLAINT \(CC\):/g, "मुख्य स्वास्थ्य समस्या (Chief Complaint):")
+      .replace(/PRADHANA VEDANA \(CHIEF COMPLAINT & VIKRITI\):/g, "प्रधान वेदना (मुख्य लक्षण एवं विकृति):")
+      .replace(/HISTORY OF PRESENT ILLNESS \(HPI\):/g, "वर्तमान बीमारी का इतिहास (HPI):")
+      .replace(/ROGA ITIHASA \(HPI & DOSHA AGGRAVATION\):/g, "रोग इतिहास (दोष प्रकोप एवं अवधि):")
       .replace(/Onset \/ Duration:/g, "शुरुआत / अवधि:")
+      .replace(/Onset & Duration:/g, "शुरुआत एवं अवधि:")
       .replace(/Severity:/g, "गंभीरता:")
-      .replace(/Associated symptoms:/g, "अन्य संबंधित लक्षण:")
+      .replace(/Severity & Aggravating Factors:/g, "गंभीरता और बढ़ाने वाले कारक:")
       .replace(/Location:/g, "स्थान:")
       .replace(/Character:/g, "लक्षण का प्रकार:")
       .replace(/Radiation:/g, "फैलाव:")
-      .replace(/Aggravating factors:/g, "बढ़ाने वाले कारक:")
-      .replace(/Relieving factors:/g, "राहत देने वाले कारक:")
-      .replace(/Past Medical History:/g, "पूर्व चिकित्सा इतिहास (Past Medical History):")
-      .replace(/Allergies:/g, "एलर्जी (Allergies):")
-      .replace(/Medications:/g, "वर्तमान दवाएं (Medications):")
-      .replace(/Red Flags:/g, "आपातकालीन चेतावनी (Red Flags):")
-      .replace(/DOCUMENT ALERT:/g, "दस्तावेज़ सुरक्षा चेतावनी:")
-      .replace(/Headache/gi, "सिरदर्द")
-      .replace(/chest pain/gi, "छाती में दर्द")
-      .replace(/No history reported/g, "कोई पूर्व बीमारी दर्ज नहीं की गई")
-      .replace(/No known allergies reported/g, "कोई ज्ञात एलर्जी दर्ज नहीं की गई")
+      .replace(/Aggravating Factors:/g, "बढ़ाने वाले कारक:")
+      .replace(/Relieving Factors:/g, "राहत देने वाले कारक:")
+      .replace(/Associated Symptoms:/g, "संबंधित अन्य लक्षण:")
+      .replace(/Daily \/ Dietary Triggers:/g, "दैनिक एवं आहार ट्रिगर:")
+      .replace(/REVIEW OF SYSTEMS \(ROS\):/g, "शारीरिक प्रणाली समीक्षा (Review of Systems):")
+      .replace(/DASHAVIDHA PARIKSHA \(10-FOLD CLINICAL MATRIX\):/g, "दशविध परीक्षा (10-चरणीय आयुष नैदानिक परीक्षण):")
+      .replace(/1\. Deha Prakriti \(Thermal Traits & Skin\):/g, "1. देह प्रकृति (तापमान सहनशीलता एवं त्वचा):")
+      .replace(/2\. Vikriti \(Current Symptoms & Imbalance\):/g, "2. विकृति (वर्तमान लक्षण एवं असंतुलन):")
+      .replace(/3\. Agni Pariksha \(Hunger & Digestion\):/g, "3. अग्नि परीक्षा (भूख, पाचन एवं एसिडिटी):")
+      .replace(/4\. Koshtha Pariksha \(Stool & Bowel Habits\):/g, "4. कोष्ठ परीक्षा (शौच एवं मल त्याग):")
+      .replace(/5\. Sara Pariksha \(Tissue Vitality & Energy\):/g, "5. सार परीक्षा (शारीरिक ऊर्जा एवं धातु सार):")
+      .replace(/6\. Samhanana \(Body Build & Compactness\):/g, "6. संहनन (शारीरिक बनावट):")
+      .replace(/7\. Pramana \(Proportions & Weight Frame\):/g, "7. प्रमाण (शारीरिक अनुपात एवं वजन):")
+      .replace(/8\. Satmya \(Dietary Habituation & Suitability\):/g, "8. सात्म्य (खान-पान की अनुकूलता):")
+      .replace(/9\. Sattva \(Mental Resilience & Emotions\):/g, "9. सत्त्व परीक्षा (मानसिक स्थिति एवं तनाव):")
+      .replace(/10\. Ahara & Vyayama Shakti \(Capacity\):/g, "10. आहार एवं व्यायाम शक्ति (पाचन एवं व्यायाम क्षमता):")
+      .replace(/NIDRA & VIHARA \(SLEEP & DAILY HABITS\):/g, "निद्रा एवं विहार (नींद और दिनचर्या):")
+      .replace(/Nidra \(Sleep Quality & Routine\):/g, "निद्रा (नींद की गुणवत्ता एवं समय):")
+      .replace(/Vihara \(Daily Lifestyle & Habits\):/g, "विहार (दैनिक दिनचर्या और आदतें):")
+      .replace(/PURVA VYADHI & AUSHADHI \(PAST ILLNESSES & MEDICATIONS\):/g, "पूर्व व्याधि एवं औषधि (पिछली बीमारियाँ और दवाएं):")
+      .replace(/PAST MEDICAL & SURGICAL HISTORY:/g, "पूर्व चिकित्सा एवं शल्य इतिहास:")
+      .replace(/Past Medical History:/g, "पूर्व चिकित्सा इतिहास:")
+      .replace(/Past Surgical History:/g, "पूर्व शल्य चिकित्सा इतिहास:")
+      .replace(/CURRENT MEDICATIONS & ALLERGIES:/g, "वर्तमान दवाएं एवं एलर्जी:")
+      .replace(/Current Medications:/g, "वर्तमान दवाएं:")
+      .replace(/Drug \/ Food Allergies:/g, "दवा या भोजन एलर्जी:")
+      .replace(/Asatmya \/ Allergies:/g, "असात्म्य / एलर्जी:")
+      .replace(/EMERGENCY RED FLAGS & TRIAGE ALERTS:/g, "आपातकालीन चेतावनी और ट्राइएज अलर्ट (Red Flags):")
+      .replace(/ATYAYIKA AVASTHA \(EMERGENCY RED FLAGS\):/g, "आत्ययिक अवस्था (आपातकालीन चेतावनी - Red Flags):")
+      .replace(/CLINICAL IMPRESSION & WORKUP RECOMMENDATION:/g, "चिकित्सकीय निष्कर्ष और प्रारंभिक जांच सुझाव:")
+      .replace(/CHIKITSA SUTRA & PHYSICIAN NOTICE:/g, "चिकित्सा सूत्र एवं चिकित्सक सूचना:")
+      .replace(/None detected - Hemodynamically stable/g, "कोई आपातकालीन लक्षण नहीं पाया गया - मरीज स्थिर है")
+      .replace(/None detected - Patient hemodynamically stable/g, "कोई आपातकालीन लक्षण नहीं पाया गया - मरीज स्थिर है")
       .replace(/None reported/g, "कोई नहीं")
-      .replace(/None detected/g, "कोई आपातकालीन लक्षण नहीं पाया गया")
+      .replace(/No chronic illness reported/g, "कोई पुरानी बीमारी दर्ज नहीं की गई")
+      .replace(/No past surgeries reported/g, "कोई पिछली सर्जरी दर्ज नहीं की गई")
+      .replace(/No known allergies reported/g, "कोई ज्ञात एलर्जी दर्ज नहीं की गई")
+      .replace(/No known drug or food allergies/g, "दवा या भोजन से कोई ज्ञात एलर्जी नहीं है")
+      .replace(/DOCUMENT ALERT:/g, "दस्तावेज़ सुरक्षा चेतावनी:")
       .replace(/Not specified/g, "निर्दिष्ट नहीं है");
   }
   if (lang === "ta") {
     return text
-      .replace(/GENERAL MEDICINE OPD/g, "பொது மருத்துவ வெளிப்புறப் பிரிவு (OPD)")
-      .replace(/Patient:/g, "நோயாளி பெயர்:")
+      .replace(/GENERAL MEDICINE CLINICAL OPD SUMMARY & TRIAGE REPORT/g, "பொது மருத்துவ மருத்துவமனை OPD சுருக்கம் மற்றும் ட்ரையேஜ் அறிக்கை")
+      .replace(/AYUSH CLINICAL OPD - ROGA ITIHASA & PARIKSHA REPORT/g, "ஆயுஷ் மருத்துவமனை OPD - நோய் வரலாறு மற்றும் பரிசோதனை அறிக்கை")
+      .replace(/PATIENT DEMOGRAPHICS:/g, "நோயாளி விவரங்கள்:")
+      .replace(/ROGI VIVARANA \(PATIENT DEMOGRAPHICS\):/g, "நோயாளி விவரங்கள் (Rogi Vivarana):")
+      .replace(/Rogi \(Patient Name\):/g, "நோயாளி பெயர்:")
+      .replace(/Name:/g, "பெயர்:")
+      .replace(/Vaya \(Age\):/g, "வயது (Vaya):")
       .replace(/Age:/g, "வயது:")
+      .replace(/Linga \(Gender\):/g, "பாலினம் (Linga):")
       .replace(/Gender:/g, "பாலினம்:")
-      .replace(/Chief Complaint:/g, "முதன்மை ஆரோக்கியப் பிரச்சினை:")
-      .replace(/HPI:/g, "தற்போதைய நோய் வரலாறு (HPI):")
+      .replace(/Department:/g, "பிரிவு:")
+      .replace(/CHIEF COMPLAINT \(CC\):/g, "முதன்மை ஆரோக்கியப் பிரச்சினை (Chief Complaint):")
+      .replace(/PRADHANA VEDANA \(CHIEF COMPLAINT & VIKRITI\):/g, "முதன்மை உபாதை மற்றும் தோஷ மாற்றம் (Pradhana Vedana):")
+      .replace(/HISTORY OF PRESENT ILLNESS \(HPI\):/g, "தற்போதைய நோய் வரலாறு (HPI):")
+      .replace(/ROGA ITIHASA \(HPI & DOSHA AGGRAVATION\):/g, "நோய் வரலாறு மற்றும் தோஷ சீர்கேடு (Roga Itihasa):")
       .replace(/Onset \/ Duration:/g, "தொடக்கம் / காலம்:")
+      .replace(/Onset & Duration:/g, "தொடக்கம் மற்றும் காலம்:")
       .replace(/Severity:/g, "கடுமை:")
-      .replace(/Associated symptoms:/g, "தொடர்புடைய பிற அறிகுறிகள்:")
+      .replace(/Severity & Aggravating Factors:/g, "கடுமை மற்றும் அதிகரிக்கும் காரணிகள்:")
       .replace(/Location:/g, "இடம்:")
       .replace(/Character:/g, "அறிகுறி வகை:")
       .replace(/Radiation:/g, "பரவும் இடம்:")
-      .replace(/Aggravating factors:/g, "அதிகரிக்கும் காரணிகள்:")
-      .replace(/Relieving factors:/g, "தணிக்கும் காரணிகள்:")
+      .replace(/Aggravating Factors:/g, "அதிகரிக்கும் காரணிகள்:")
+      .replace(/Relieving Factors:/g, "தணிக்கும் காரணிகள்:")
+      .replace(/Associated Symptoms:/g, "தொடர்புடைய பிற அறிகுறிகள்:")
+      .replace(/Daily \/ Dietary Triggers:/g, "தினசரி மற்றும் உணவுத் தூண்டல்கள்:")
+      .replace(/REVIEW OF SYSTEMS \(ROS\):/g, "உடல் மண்டல ஆய்வு (Review of Systems):")
+      .replace(/DASHAVIDHA PARIKSHA \(10-FOLD CLINICAL MATRIX\):/g, "தசவித பரிட்சை (10-படி ஆயுஷ் மருத்துவப் பரிசோதனை):")
+      .replace(/1\. Deha Prakriti \(Thermal Traits & Skin\):/g, "1. தேக பிரகிருதி (உடல் வெப்ப உணர்வு மற்றும் சருமம்):")
+      .replace(/2\. Vikriti \(Current Symptoms & Imbalance\):/g, "2. விக்ருதி (தற்போதைய தோஷ மாற்றம் மற்றும் அறிகுறிகள்):")
+      .replace(/3\. Agni Pariksha \(Hunger & Digestion\):/g, "3. அக்னி பரீட்சை (பசி, செரிமானம் மற்றும் அசிடிட்டி):")
+      .replace(/4\. Koshtha Pariksha \(Stool & Bowel Habits\):/g, "4. கோஷ்ட பரீட்சை (மலம் கழிக்கும் பழக்கம்):")
+      .replace(/5\. Sara Pariksha \(Tissue Vitality & Energy\):/g, "5. சார பரீட்சை (உடல் பலம் மற்றும் தாது சாரம்):")
+      .replace(/6\. Samhanana \(Body Build & Compactness\):/g, "6. சம்ஹனன பரீட்சை (உடல் கட்டமைப்பு):")
+      .replace(/7\. Pramana \(Proportions & Weight Frame\):/g, "7. பிரமாண பரீட்சை (உடல் விகிதம் மற்றும் எடை):")
+      .replace(/8\. Satmya \(Dietary Habituation & Suitability\):/g, "8. சாத்மிய பரீட்சை (உணவுப் பழக்கம் மற்றும் ஒவ்வாமை):")
+      .replace(/9\. Sattva \(Mental Resilience & Emotions\):/g, "9. சத்துவ பரீட்சை (மன உறுதி மற்றும் உணர்ச்சி நிலை):")
+      .replace(/10\. Ahara & Vyayama Shakti \(Capacity\):/g, "10. ஆகார & வியாயாம சக்தி (உணவு மற்றும் உடற்பயிற்சி திறன்):")
+      .replace(/NIDRA & VIHARA \(SLEEP & DAILY HABITS\):/g, "நித்திரை மற்றும் விகாரம் (தூக்கம் மற்றும் அன்றாட வழக்கம்):")
+      .replace(/Nidra \(Sleep Quality & Routine\):/g, "நித்திரை (தூக்கத்தின் தரம் மற்றும் வழக்கம்):")
+      .replace(/Vihara \(Daily Lifestyle & Habits\):/g, "விகாரம் (தினசரி வாழ்க்கை முறை மற்றும் பழக்கங்கள்):")
+      .replace(/PURVA VYADHI & AUSHADHI \(PAST ILLNESSES & MEDICATIONS\):/g, "முந்தைய நோய்கள் மற்றும் மருந்துகள்:")
+      .replace(/PAST MEDICAL & SURGICAL HISTORY:/g, "முந்தைய மருத்துவ மற்றும் அறுவை சிகிச்சை வரலாறு:")
       .replace(/Past Medical History:/g, "முந்தைய மருத்துவ வரலாறு:")
-      .replace(/Allergies:/g, "ஒவ்வாமை (Allergies):")
-      .replace(/Medications:/g, "தற்போதைய மருந்துகள்:")
-      .replace(/Red Flags:/g, "அவசர எச்சரிக்கை (Red Flags):")
-      .replace(/DOCUMENT ALERT:/g, "ஆவண பாதுகாப்பு எச்சரிக்கை:")
-      .replace(/Headache/gi, "தலைவலி")
-      .replace(/chest pain/gi, "நெஞ்சு வலி")
-      .replace(/No history reported/g, "முந்தைய நோய் வரலாறு எதுவும் இல்லை")
-      .replace(/No known allergies reported/g, "ஒவ்வாமை எதுவும் பதிவு செய்யப்படவில்லை")
+      .replace(/Past Surgical History:/g, "முந்தைய அறுவை சிகிச்சை வரலாறு:")
+      .replace(/CURRENT MEDICATIONS & ALLERGIES:/g, "தற்போதைய மருந்துகள் மற்றும் ஒவ்வாமை:")
+      .replace(/Current Medications:/g, "தற்போதைய மருந்துகள்:")
+      .replace(/Drug \/ Food Allergies:/g, "மருந்து அல்லது உணவு ஒவ்வாமை:")
+      .replace(/Asatmya \/ Allergies:/g, "அசாத்மியா / ஒவ்வாமை:")
+      .replace(/EMERGENCY RED FLAGS & TRIAGE ALERTS:/g, "அவசர எச்சரிக்கை மற்றும் ட்ரையேஜ் முன்னறிவிப்பு (Red Flags):")
+      .replace(/ATYAYIKA AVASTHA \(EMERGENCY RED FLAGS\):/g, "அத்தியாயிக அவஸ்தை (அவசர எச்சரிக்கை - Red Flags):")
+      .replace(/CLINICAL IMPRESSION & WORKUP RECOMMENDATION:/g, "மருத்துவக் கணிப்பு மற்றும் பரிசோதனைப் பரிந்துரைகள்:")
+      .replace(/CHIKITSA SUTRA & PHYSICIAN NOTICE:/g, "சிகிச்சை சூத்திரம் மற்றும் மருத்துவர் அறிவிப்பு:")
+      .replace(/None detected - Hemodynamically stable/g, "அவசர அறிகுறிகள் எதுவும் இல்லை - நோயாளி நிலையாக உள்ளார்")
+      .replace(/None detected - Patient hemodynamically stable/g, "அவசர அறிகுறிகள் எதுவும் இல்லை - நோயாளி நிலையாக உள்ளார்")
       .replace(/None reported/g, "எதுவும் இல்லை")
-      .replace(/None detected/g, "அவசர அறிகுறிகள் எதுவும் கண்டறியப்படவில்லை")
+      .replace(/No chronic illness reported/g, "முந்தைய நாள்பட்ட நோய்கள் எதுவும் இல்லை")
+      .replace(/No past surgeries reported/g, "அறுவை சிகிச்சை எதுவும் செய்யப்படவில்லை")
+      .replace(/No known allergies reported/g, "ஒவ்வாமை எதுவும் பதிவு செய்யப்படவில்லை")
+      .replace(/No known drug or food allergies/g, "மருந்து அல்லது உணவு ஒவ்வாமை எதுவும் இல்லை")
+      .replace(/DOCUMENT ALERT:/g, "ஆவண பாதுகாப்பு எச்சரிக்கை:")
       .replace(/Not specified/g, "குறிப்பிடப்படவில்லை");
   }
   return text;
@@ -389,85 +534,227 @@ export default function PatientDetailPage() {
         </div>
       )}
 
-      {/* AYUSH OPD - Dashavidha Pariksha 10-Fold Clinical Matrix */}
+      {/* AYUSH OPD - Structured Clinical Matrix for Doctor Review */}
       {summary?.ayushAssessment && (
         <div className="card" style={{ marginBottom: 20, border: "1.5px solid #a7f3d0", background: "#f0fdf4" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
             <div>
-              <h3 style={{ fontSize: 17, margin: 0, color: "#065f46" }}>🌿 DASHAVIDHA PARIKSHA (10-Fold AYUSH Clinical Examination)</h3>
-              <p style={{ fontSize: 13, color: "#047857", margin: "2px 0 0" }}>
-                Verify patient-reported responses and confirm clinician clinical findings.
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h3 style={{ fontSize: 18, margin: 0, color: "#065f46" }}>🌿 AYUSH CLINICAL INTAKE MATRIX & DASHAVIDHA PARIKSHA</h3>
+                <span style={{ background: "#d1fae5", color: "#047857", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                  Doctor Review & Verification
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: "#047857", margin: "4px 0 0" }}>
+                Verify natural patient-reported intake observations against Ayurvedic clinical parameters. Edit or confirm before consultation.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ background: "#059669", color: "#ffffff", border: "none", borderRadius: 6, fontSize: 12, padding: "5px 12px", fontWeight: 600 }}
+                onClick={() => {
+                  const updated = { ...summary };
+                  Object.keys(updated.ayushAssessment).forEach((k) => {
+                    const itm = updated.ayushAssessment[k];
+                    itm.clinicianConfirmed = true;
+                    if (!itm.clinicianValue) itm.clinicianValue = itm.patientReported || "Clinician Verified";
+                  });
+                  setSummary({ ...updated });
+                }}
+              >
+                ✓ Confirm All Mappings
+              </button>
+            </div>
+          </div>
+
+          <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", borderRadius: 8, padding: "8px 12px", marginBottom: 14, fontSize: 12.5, color: "#065f46" }}>
+            🛡️ <strong>Clinical Safety Scope:</strong> The Live AI Intake Assistant collected patient-reported symptoms and characteristics using natural non-technical questions. Prakriti, Vikriti, and Dosha clinical diagnoses are exclusively determined and confirmed by the attending AYUSH clinician below.
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+              <thead>
+                <tr style={{ background: "#d1fae5", textTransform: "uppercase", fontSize: 11, color: "#065f46", letterSpacing: "0.05em" }}>
+                  <th style={{ padding: "10px 12px", textAlign: "left", width: "25%" }}>Clinical Parameter</th>
+                  <th style={{ padding: "10px 12px", textAlign: "left", width: "35%" }}>Patient-Reported Intake Observation</th>
+                  <th style={{ padding: "10px 12px", textAlign: "left", width: "15%" }}>Verification</th>
+                  <th style={{ padding: "10px 12px", textAlign: "left", width: "25%" }}>Doctor Clinical Value / Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(summary.ayushAssessment).map(([key, val]) => {
+                  const meta = AYUSH_FIELD_META[key] || {};
+                  return (
+                    <tr key={key} style={{ borderBottom: "1px solid #a7f3d0" }}>
+                      <td style={{ padding: "10px 12px", verticalAlign: "top" }}>
+                        <div style={{ fontWeight: 700, color: "#111827", fontSize: 14 }}>
+                          {meta.label || titleCase(key)}
+                        </div>
+                        {meta.sanskrit && (
+                          <div style={{ fontSize: 11.5, color: "#059669", fontWeight: 600, marginTop: 2 }}>
+                            {meta.sanskrit}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px 12px", color: "#374151", verticalAlign: "top", lineHeight: 1.45 }}>
+                        {val?.patientReported ? (
+                          <span>{val.patientReported}</span>
+                        ) : (
+                          <span style={{ color: "#9ca3af", fontStyle: "italic" }}>Not reported</span>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px 12px", verticalAlign: "top" }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{
+                            background: val?.clinicianConfirmed ? "#10b981" : "#e5e7eb",
+                            color: val?.clinicianConfirmed ? "#ffffff" : "#374151",
+                            borderRadius: 6,
+                            padding: "4px 10px",
+                            fontSize: 12,
+                            border: "none",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                          onClick={() => {
+                            const updated = { ...summary };
+                            const item = updated.ayushAssessment[key];
+                            item.clinicianConfirmed = !item.clinicianConfirmed;
+                            if (item.clinicianConfirmed && !item.clinicianValue) {
+                              item.clinicianValue = item.patientReported;
+                            }
+                            setSummary({ ...updated });
+                          }}
+                        >
+                          {val?.clinicianConfirmed ? "✓ Verified" : "+ Verify"}
+                        </button>
+                      </td>
+                      <td style={{ padding: "10px 12px", verticalAlign: "top" }}>
+                        {meta.options && meta.options.length > 0 && (
+                          <select
+                            style={{
+                              width: "100%",
+                              padding: "4px 6px",
+                              borderRadius: 6,
+                              border: "1px solid #6ee7b7",
+                              fontSize: 12,
+                              background: "#ffffff",
+                              marginBottom: 4,
+                            }}
+                            value={val?.clinicianValue || ""}
+                            onChange={(e) => {
+                              const updated = { ...summary };
+                              updated.ayushAssessment[key].clinicianValue = e.target.value;
+                              updated.ayushAssessment[key].clinicianConfirmed = true;
+                              setSummary({ ...updated });
+                            }}
+                          >
+                            <option value="">-- Select Clinical Assessment --</option>
+                            {meta.options.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <input
+                          type="text"
+                          value={val?.clinicianValue || ""}
+                          placeholder={val?.patientReported || "Doctor clinical note"}
+                          onChange={(e) => {
+                            const updated = { ...summary };
+                            updated.ayushAssessment[key].clinicianValue = e.target.value;
+                            setSummary({ ...updated });
+                          }}
+                          style={{
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            border: "1px solid #6ee7b7",
+                            fontSize: 12.5,
+                            width: "100%",
+                            background: "#ffffff",
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* GENERAL MEDICINE OPD - Structured SOCRATES Evaluation Panel */}
+      {(!summary?.ayushAssessment && (summary?.hpi || summary?.chief_complaint)) && (
+        <div className="card" style={{ marginBottom: 20, border: "1.5px solid #bae6fd", background: "#f0f9ff" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h3 style={{ fontSize: 18, margin: 0, color: "#0369a1" }}>🏥 GENERAL MEDICINE CLINICAL EVALUATION & SOCRATES MATRIX</h3>
+                <span style={{ background: "#e0f2fe", color: "#0284c7", padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                  Doctor Review & Verification
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: "#0284c7", margin: "4px 0 0" }}>
+                Structured clinical intake history and Review of Systems for physician evaluation.
               </p>
             </div>
           </div>
 
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          {/* Quick Triage Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, marginBottom: 14 }}>
+            <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 8, border: "1px solid #e0f2fe" }}>
+              <div style={{ fontSize: 11.5, color: "var(--slate)", textTransform: "uppercase", fontWeight: 600 }}>Chief Complaint</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginTop: 2 }}>
+                {summary.chief_complaint?.text || summary.chief_complaint?.text_en || "Reported"}
+              </div>
+            </div>
+            <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 8, border: "1px solid #e0f2fe" }}>
+              <div style={{ fontSize: 11.5, color: "var(--slate)", textTransform: "uppercase", fontWeight: 600 }}>Onset / Duration</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginTop: 2 }}>
+                {summary.hpi?.onset || "Not specified"}
+              </div>
+            </div>
+            <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 8, border: "1px solid #e0f2fe" }}>
+              <div style={{ fontSize: 11.5, color: "var(--slate)", textTransform: "uppercase", fontWeight: 600 }}>Severity Score</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: summary.hpi?.severity?.includes("severe") || Number(summary.hpi?.severity) >= 7 ? "#dc2626" : "#0284c7", marginTop: 2 }}>
+                {summary.hpi?.severity || "Reported"}
+              </div>
+            </div>
+            <div style={{ background: "#ffffff", padding: "10px 14px", borderRadius: 8, border: "1px solid #e0f2fe" }}>
+              <div style={{ fontSize: 11.5, color: "var(--slate)", textTransform: "uppercase", fontWeight: 600 }}>Triage Red Flags</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: summary.red_flags?.length ? "#dc2626" : "#16a34a", marginTop: 2 }}>
+                {summary.red_flags?.length ? `🚨 ${summary.red_flags.length} Alert(s)` : "🟢 Hemodynamically Stable"}
+              </div>
+            </div>
+          </div>
+
+          {/* SOCRATES Breakdown Table */}
+          <div style={{ background: "#ffffff", borderRadius: 10, border: "1px solid #e0f2fe", overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
               <thead>
-                <tr style={{ background: "#d1fae5", textTransform: "uppercase", fontSize: 11, color: "#065f46", letterSpacing: "0.05em" }}>
-                  <th style={{ padding: "8px 12px", textAlign: "left" }}>Examination Parameter</th>
-                  <th style={{ padding: "8px 12px", textAlign: "left" }}>Patient Reported</th>
-                  <th style={{ padding: "8px 12px", textAlign: "left" }}>Clinician Confirmation</th>
-                  <th style={{ padding: "8px 12px", textAlign: "left" }}>Clinician Value</th>
+                <tr style={{ background: "#e0f2fe", textTransform: "uppercase", fontSize: 11, color: "#0369a1", letterSpacing: "0.05em" }}>
+                  <th style={{ padding: "8px 12px", textAlign: "left", width: "30%" }}>SOCRATES Dimension</th>
+                  <th style={{ padding: "8px 12px", textAlign: "left", width: "70%" }}>Patient Reported Observation</th>
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(summary.ayushAssessment).map(([key, val]) => (
-                  <tr key={key} style={{ borderBottom: "1px solid #a7f3d0" }}>
-                    <td style={{ padding: "10px 12px", fontWeight: 600, color: "#111827" }}>
-                      {titleCase(key)}
-                    </td>
-                    <td style={{ padding: "10px 12px", color: "#374151" }}>
-                      {val?.patientReported || <span style={{ color: "#9ca3af", fontStyle: "italic" }}>Not reported</span>}
-                    </td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        style={{
-                          background: val?.clinicianConfirmed ? "#10b981" : "#e5e7eb",
-                          color: val?.clinicianConfirmed ? "#ffffff" : "#374151",
-                          borderRadius: 6,
-                          padding: "4px 10px",
-                          fontSize: 12,
-                          border: "none",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                        }}
-                        onClick={() => {
-                          const updated = { ...summary };
-                          const item = updated.ayushAssessment[key];
-                          item.clinicianConfirmed = !item.clinicianConfirmed;
-                          if (item.clinicianConfirmed && !item.clinicianValue) {
-                            item.clinicianValue = item.patientReported;
-                          }
-                          setSummary({ ...updated });
-                        }}
-                      >
-                        {val?.clinicianConfirmed ? "✓ Confirmed" : "+ Confirm"}
-                      </button>
-                    </td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <input
-                        type="text"
-                        value={val?.clinicianValue || ""}
-                        placeholder={val?.patientReported || "Doctor note"}
-                        onChange={(e) => {
-                          const updated = { ...summary };
-                          updated.ayushAssessment[key].clinicianValue = e.target.value;
-                          setSummary({ ...updated });
-                        }}
-                        style={{
-                          padding: "4px 8px",
-                          borderRadius: 6,
-                          border: "1px solid #6ee7b7",
-                          fontSize: 13,
-                          width: "100%",
-                          maxWidth: 200,
-                          background: "#ffffff",
-                        }}
-                      />
-                    </td>
+                {[
+                  ["Onset & Timing", summary.hpi?.onset || "Not specified"],
+                  ["Location", summary.hpi?.location || "Not specified"],
+                  ["Character & Quality", summary.hpi?.character || "Not specified"],
+                  ["Radiation", summary.hpi?.radiation || "None reported"],
+                  ["Aggravating Factors", summary.hpi?.exacerbating_factors || "None reported"],
+                  ["Relieving Factors", summary.hpi?.relieving_factors || "None reported"],
+                  ["Associated Symptoms", summary.hpi?.associated_symptoms || "None reported"],
+                ].map(([label, val], idx) => (
+                  <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={{ padding: "8px 12px", fontWeight: 600, color: "#334155" }}>{label}</td>
+                    <td style={{ padding: "8px 12px", color: "#0f172a" }}>{val}</td>
                   </tr>
                 ))}
               </tbody>

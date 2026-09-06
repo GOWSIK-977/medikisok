@@ -8,16 +8,21 @@ function createSession({ name, age, gender, language, department = 'GENERAL_MEDI
 
   const ayushAssessment = isAyush
     ? {
-        prakriti: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
-        vikriti: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
-        sara: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
-        samhanana: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
-        pramana: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
-        satmya: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
-        sattva: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
-        ahara_shakti: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
-        vyayama_shakti: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
-        vaya: { patientReported: '', clinicianConfirmed: false, clinicianValue: '' },
+        // Core AYUSH clinical parameters mapped from patient natural responses
+        prakriti: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Thermal & skin traits' },
+        vikriti: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Present symptoms & triggers' },
+        agni: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Hunger, digestion, acidity & bloating' },
+        koshtha: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Stool & bowel evacuation nature' },
+        sara: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Tissue vitality & endurance' },
+        samhanana: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Body compactness & build' },
+        pramana: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Height, weight & proportions' },
+        satmya: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Food adaptability & taste preference' },
+        sattva: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Mental resilience & stress coping' },
+        ahara_shakti: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Food intake capacity & appetite' },
+        vyayama_shakti: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Physical strength & exercise tolerance' },
+        nidra: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Sleep quality & waking freshness' },
+        vihara: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Daily lifestyle, hydration & habits' },
+        vaya: { patientReported: '', clinicianConfirmed: false, clinicianValue: '', clinicalIndicator: 'Age stage classification' },
       }
     : null;
 
@@ -25,7 +30,7 @@ function createSession({ name, age, gender, language, department = 'GENERAL_MEDI
     id,
     department,
     createdAt: new Date().toISOString(),
-    currentSection: 'chief_complaint',
+    currentSection: isAyush ? 'ayush_intake' : 'chief_complaint',
     complaintCategory: null,
     hpiFieldOrder: [],
     hpiFieldIndex: 0,

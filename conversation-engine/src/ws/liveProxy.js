@@ -2,13 +2,14 @@
  * True Gemini Live API WebSocket Proxy for conversation-engine (Person 1)
  * Endpoint: ws://localhost:4000/ws/live/:sessionId
  *
- * Security:
- * GEMINI_API_KEY remains strictly on the server in process.env.GEMINI_API_KEY.
- * Never exposed to browser client or network frames.
+ * Fully supports English, Hindi, and Tamil text streaming for both
+ * General Medicine OPD and AYUSH OPD.
  */
 
 const WebSocket = require('ws');
 const store = require('../session/sessionStore');
+const stateMachine = require('../dialogue/stateMachine');
+const qb = require('../dialogue/questionBank');
 const redFlagRules = require('../dialogue/redFlags').RULES;
 
 function setupLiveProxy(wss) {
@@ -33,240 +34,192 @@ function setupLiveProxy(wss) {
     }
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!apiKey) {
-      console.error('[LIVE PROXY ERROR] GEMINI_API_KEY is missing in server environment!');
-      ws.send(JSON.stringify({ type: 'error', message: 'GEMINI_API_KEY not configured on server.' }));
-      ws.close(1011, 'Server API Key Missing');
-      return;
+
+    const patientLang = session.schema?.patient?.preferred_language || session.language || 'en';
+    const isAyush = session.department === 'AYUSH';
+
+    // Ensure session.pendingQuestion is initialized in the patient's language
+    if (!session.pendingQuestion) {
+      session.pendingQuestion = stateMachine.firstQuestion(session);
     }
 
-    const patientLang = session.schema?.patient?.preferred_language || 'en';
+    const openingGreeting = session.pendingQuestion?.prompt || (
+      isAyush
+        ? (patientLang.startsWith('ta')
+            ? 'வணக்கம்! நான் உங்கள் ஆயுஷ் ஏஐ மருத்துவ உதவியாளர். சமீபத்தில் உங்களுக்கு என்ன விதமான உடல் உபாதைகள் அல்லது மாற்றங்கள் ஏற்படுகின்றன?'
+            : patientLang.startsWith('hi')
+            ? 'नमस्ते! मैं आपका आयुष एआई स्वास्थ्य सहायक हूँ। हाल ही में आप किस तरह की शारीरिक परेशानी या बदलाव महसूस कर रहे हैं?'
+            : 'Hello! I am your AYUSH AI Intake Assistant. What current symptoms or physical changes brought you in today?')
+        : (patientLang.startsWith('ta')
+            ? 'வணக்கம்! நான் உங்கள் ஏஐ மருத்துவ உதவியாளர். இன்று உங்களுக்கு ஏற்பட்டுள்ள முதன்மை உடல்நலப் பிரச்சினை என்ன?'
+            : patientLang.startsWith('hi')
+            ? 'नमस्ते! मैं आपका एआई मेडिकल सहायक हूँ। आज आपको क्या मुख्य स्वास्थ्य समस्या है जिसके लिए आप अस्पताल आए हैं?'
+            : 'Hello! I am your AI clinical assistant. What is the main health problem that brought you in today?')
+    );
 
     let langInstruction = '';
-    if (patientLang.startsWith('hi')) {
-      langInstruction = `The patient selected Hindi. Conduct the entire clinical intake interview naturally in spoken Hindi.
-Begin the conversation immediately by speaking a warm opening question in Hindi: "नमस्ते! मैं आपका एआई मेडिकल सहायक हूँ। आज आपको क्या स्वास्थ्य समस्या है?"
-Understand spoken Hindi and respond ONLY in natural spoken Hindi.`;
-    } else if (patientLang.startsWith('ta')) {
-      langInstruction = `The patient selected Tamil. Conduct the entire clinical intake interview naturally in spoken Tamil.
-Begin the conversation immediately by speaking a warm opening question in Tamil: "வணக்கம்! நான் உங்கள் ஏஐ மருத்துவ உதவியாளர். இன்று உங்களுக்கு என்ன ஆரோக்கியப் பிரச்சினை உள்ளது?"
-Understand spoken Tamil and respond ONLY in natural spoken Tamil.`;
+    if (isAyush) {
+      if (patientLang.startsWith('hi')) {
+        langInstruction = 'The patient selected Hindi. Speak and respond ONLY in natural, polite Hindi.';
+      } else if (patientLang.startsWith('ta')) {
+        langInstruction = 'The patient selected Tamil. Speak and respond ONLY in natural, polite Tamil.';
+      } else {
+        langInstruction = 'The patient selected English. Speak and respond in natural, polite English.';
+      }
     } else {
-      langInstruction = `The patient selected English. Conduct the entire clinical intake interview naturally in spoken English.
-Begin the conversation immediately by speaking a warm opening question in English: "Hello! I am your AI clinical assistant. What health problem brought you in today?"
-Understand spoken English and respond in natural spoken English.`;
+      if (patientLang.startsWith('hi')) {
+        langInstruction = 'The patient selected Hindi. Speak and respond ONLY in natural spoken Hindi.';
+      } else if (patientLang.startsWith('ta')) {
+        langInstruction = 'The patient selected Tamil. Speak and respond ONLY in natural spoken Tamil.';
+      } else {
+        langInstruction = 'The patient selected English. Speak and respond in natural spoken English.';
+      }
     }
 
-    const systemInstructionText = `You are MediKiosk AI, an empathetic, conversational medical voice assistant (for hospital patient intake).
-
+    const systemInstructionText = isAyush
+      ? `You are the AYUSH Live AI Intake Voice Assistant at an AYUSH hospital outpatient department (OPD).
 ${langInstruction}
+Patient Name: ${session.schema?.patient?.name || 'Patient'}
+CRITICAL: Speak directly to the patient in 1 short sentence. NEVER output English meta-commentary or say "as an AI". Never use technical Sanskrit terms.`
+      : `You are MediKiosk Live AI Medical Intake Voice Assistant.
+${langInstruction}
+Patient Name: ${session.schema?.patient?.name || 'Patient'}
+CRITICAL: Speak directly to the patient in 1 short sentence. NEVER output English meta-commentary or say "as an AI".`;
 
-=== PATIENT CONTEXT ===
-- Name: ${session.schema?.patient?.name || 'Patient'}
-- Age: ${session.schema?.patient?.age || 'Unknown'}
-- Gender: ${session.schema?.patient?.gender || 'Unknown'}
-
-=== MANDATORY CONVERSATIONAL GUIDELINES ===
-1. SPEAK DIRECTLY TO THE PATIENT as a warm, professional assistant.
-2. NEVER output internal thoughts, preambles, meta-commentary, or headers (e.g. NEVER output "**Initiating Patient Interaction**" or "As an AI...").
-3. Speak in 1-2 concise, natural sentences at a time.
-4. Collect the patient's clinical history step-by-step: chief complaint, onset/duration, severity, associated symptoms, past medical history, and allergies.
-5. NEVER ask for information that the patient has already provided in the conversation.
-6. Acknowledge what the patient says with empathy and ask the single next logical question.
-7. Do not diagnose conditions or prescribe medications.
-8. When sufficient history is collected (or after 5-7 short exchanges), thank the patient and conclude gracefully.`;
-
-    // Connect server-side to Gemini Live API WebSocket endpoint
-    const geminiWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+    // Connect server-side to Gemini Live API WebSocket endpoint if API key available
     let geminiWs = null;
-
-    try {
-      geminiWs = new WebSocket(geminiWsUrl);
-      console.log(`[LIVE PROXY] Initiating server-side WebSocket to Gemini Live API...`);
-    } catch (err) {
-      console.error('[LIVE PROXY ERROR] Failed to connect to Gemini Live API:', err.message);
-      ws.send(JSON.stringify({ type: 'error', message: 'Could not connect to Gemini Live service.' }));
-      return;
+    if (apiKey) {
+      try {
+        const geminiWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+        geminiWs = new WebSocket(geminiWsUrl);
+        console.log(`[LIVE PROXY] Initiating server-side WebSocket to Gemini Live API...`);
+      } catch (err) {
+        console.warn('[LIVE PROXY] Gemini Live connection unavailable, falling back to local multi-lingual engine:', err.message);
+      }
     }
 
     let fullPatientTranscript = '';
-    let currentAiTranscriptBuffer = '';
     let endOfSpeechTime = 0;
     let pcmCountReceived = 0;
 
-    geminiWs.on('open', () => {
-      console.log(`[WEBSOCKET STABILITY] Gemini Live WebSocket OPENED successfully for session ${sessionId}`);
+    // Send connected status to client immediately
+    ws.send(JSON.stringify({ type: 'status', status: 'connected', message: 'MediKiosk Live session active' }));
 
-      // Send Setup Frame to Gemini Live API
-      const setupFrame = {
-        setup: {
-          model: 'models/gemini-2.5-flash-native-audio-latest',
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: 'Puck'
-                }
-              }
-            }
-          },
-          systemInstruction: {
-            parts: [{ text: systemInstructionText }]
-          }
-        }
-      };
-
-      geminiWs.send(JSON.stringify(setupFrame));
-      console.log(`[QUESTION ORIGIN] Dynamic Gemini Live initial setup frame sent with language context: ${patientLang}`);
-      ws.send(JSON.stringify({ type: 'status', status: 'connected', message: 'Gemini Live persistent session active' }));
-
-      // Trigger Gemini Live to immediately generate and speak its opening intake question in patient language
-      setTimeout(() => {
-        if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
-          endOfSpeechTime = Date.now();
-          console.log(`[LATENCY TRACK] Sent initial turn trigger to Gemini Live at ${endOfSpeechTime}`);
-
-          let initText = 'Hello, please start the patient intake interview now.';
-          if (patientLang.startsWith('hi')) {
-            initText = 'नमस्ते, कृपया मरीज का स्वास्थ्य साक्षात्कार शुरू करें।';
-          } else if (patientLang.startsWith('ta')) {
-            initText = 'வணக்கம், நோயாளிக்கான கேள்விகளைத் தொடங்குங்கள்.';
-          }
-
-          const initialTriggerFrame = {
-            clientContent: {
-              turns: [
-                {
-                  role: 'user',
-                  parts: [{ text: initText }]
-                }
-              ],
-              turnComplete: true
-            }
-          };
-          geminiWs.send(JSON.stringify(initialTriggerFrame));
-        }
-      }, 500);
-    });
-
-    geminiWs.on('message', (data) => {
-      try {
-        const msg = JSON.parse(data.toString());
-
-        if (msg.setupComplete) {
-          console.log(`[WEBSOCKET STABILITY] Gemini Live setupComplete received for session ${sessionId}`);
-        }
-
-        // 1. Handle Gemini Audio Output Chunks (24kHz 16-bit Mono PCM)
-        if (msg.serverContent?.modelTurn?.parts) {
-          if (endOfSpeechTime > 0) {
-            const firstByteTime = Date.now();
-            const rtt = firstByteTime - endOfSpeechTime;
-            console.log(`[LATENCY MEASUREMENT] RTT (End-of-speech -> First response chunk): ${rtt} ms`);
-            endOfSpeechTime = 0; // Reset
-          }
-
-          console.log(`[MIC STAGE E] Received Gemini Live response parts from API`);
-
-          for (const part of msg.serverContent.modelTurn.parts) {
-            if (part.text) {
-              // Strip any markdown thoughts or header lines if present
-              let cleanText = part.text.replace(/^\*\*.*?\*\*\s*/gm, '').trim();
-              if (cleanText) {
-                currentAiTranscriptBuffer += cleanText + ' ';
-                console.log(`[QUESTION ORIGIN] Dynamic Gemini Live output text chunk: "${cleanText.substring(0, 50)}..."`);
-                ws.send(JSON.stringify({ type: 'ai_text_chunk', text: cleanText }));
-              }
-            }
-            if (part.inlineData && part.inlineData.mimeType?.startsWith('audio/')) {
-              ws.send(JSON.stringify({
-                type: 'ai_audio_pcm',
-                data: part.inlineData.data,
-                mimeType: part.inlineData.mimeType,
-                sampleRate: 24000
-              }));
-            }
-          }
-        }
-
-        if (msg.serverContent?.turnComplete) {
-          if (currentAiTranscriptBuffer.trim()) {
-            session.transcript.push(`AI: ${currentAiTranscriptBuffer.trim()}`);
-            currentAiTranscriptBuffer = '';
-          }
-          ws.send(JSON.stringify({ type: 'turn_complete' }));
-        }
-
-        if (msg.serverContent?.interimInputTranscription) {
-          const userInterim = msg.serverContent.interimInputTranscription.text || '';
-          console.log(`[MIC STAGE E] Gemini input transcription received: "${userInterim}"`);
-          ws.send(JSON.stringify({ type: 'patient_transcript', text: userInterim, isFinal: false }));
-        }
-      } catch (err) {
-        console.error('[LIVE PROXY ERROR] Message parsing error:', err.message);
-      }
-    });
-
-    geminiWs.on('error', (err) => {
-      console.error(`[WEBSOCKET STABILITY ERROR] Gemini WS Error for session ${sessionId}:`, err.message);
-      ws.send(JSON.stringify({ type: 'error', message: 'Gemini Live error: ' + err.message }));
-    });
-
-    geminiWs.on('close', (code, reason) => {
-      console.warn(`[WEBSOCKET STABILITY CLOSE] Gemini Live connection CLOSED for session ${sessionId}. Code: ${code}, Reason: ${reason.toString() || 'none'}`);
+    // Send the opening greeting text to the client immediately so it displays in full text in the selected language!
+    setTimeout(() => {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'status', status: 'disconnected', code, reason: reason.toString() }));
+        const alreadyHasAi = session.transcript.some((t) => t.startsWith('AI:'));
+        if (!alreadyHasAi) {
+          session.transcript.push(`AI: ${openingGreeting}`);
+        }
+        ws.send(JSON.stringify({ type: 'ai_text_chunk', text: openingGreeting }));
+        ws.send(JSON.stringify({ type: 'turn_complete' }));
       }
-    });
+    }, 250);
 
-    // Handle incoming WebSocket messages from browser client
-    ws.on('message', (message) => {
+    if (geminiWs) {
+      geminiWs.on('open', () => {
+        console.log(`[WEBSOCKET STABILITY] Gemini Live WebSocket OPENED for session ${sessionId}`);
+
+        const setupFrame = {
+          setup: {
+            model: 'models/gemini-2.5-flash-native-audio-latest',
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: 'Puck',
+                  },
+                },
+              },
+            },
+            systemInstruction: {
+              parts: [{ text: systemInstructionText }],
+            },
+          },
+        };
+
+        geminiWs.send(JSON.stringify(setupFrame));
+      });
+
+      geminiWs.on('message', (data) => {
+        try {
+          const msg = JSON.parse(data.toString());
+
+          // Forward audio PCM to client for smooth voice playback
+          if (msg.serverContent?.modelTurn?.parts) {
+            for (const part of msg.serverContent.modelTurn.parts) {
+              if (part.inlineData && part.inlineData.mimeType?.startsWith('audio/')) {
+                ws.send(JSON.stringify({
+                  type: 'ai_audio_pcm',
+                  data: part.inlineData.data,
+                  mimeType: part.inlineData.mimeType,
+                  sampleRate: 24000,
+                }));
+              }
+            }
+          }
+
+          if (msg.serverContent?.turnComplete) {
+            ws.send(JSON.stringify({ type: 'turn_complete' }));
+          }
+
+          if (msg.serverContent?.interimInputTranscription) {
+            const userInterim = msg.serverContent.interimInputTranscription.text || '';
+            ws.send(JSON.stringify({ type: 'patient_transcript', text: userInterim, isFinal: false }));
+          }
+        } catch (err) {
+          console.error('[LIVE PROXY ERROR] Gemini message error:', err.message);
+        }
+      });
+
+      geminiWs.on('error', (err) => {
+        console.warn(`[WEBSOCKET STABILITY NOTICE] Gemini WS notice for session ${sessionId}:`, err.message);
+      });
+
+      geminiWs.on('close', (code) => {
+        console.log(`[WEBSOCKET STABILITY] Gemini WS closed for session ${sessionId}. Code: ${code}`);
+      });
+    }
+
+    // Handle incoming messages from browser client
+    ws.on('message', async (message) => {
       try {
         const parsed = JSON.parse(message.toString());
 
-        // Partial / Interim Patient Transcript Streaming (Mid-sentence)
+        // Interim transcript streaming from client
         if (parsed.type === 'interim_transcript' && parsed.text) {
           ws.send(JSON.stringify({ type: 'patient_transcript', text: parsed.text, isFinal: false }));
         }
 
-        // A. 16kHz PCM Audio Stream Chunk from Patient's Microphone
+        // 16kHz PCM Audio Stream Chunk from Patient Mic
         if (parsed.type === 'audio_pcm_chunk' && parsed.data) {
           pcmCountReceived += 1;
-          if (pcmCountReceived % 20 === 1) {
-            console.log(`[MIC STAGE C] Backend received PCM chunk #${pcmCountReceived} from client (Base64 len: ${parsed.data.length})`);
-          }
-
           if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
-            const realtimeFrame = {
+            geminiWs.send(JSON.stringify({
               realtimeInput: {
                 mediaChunks: [
                   {
                     mimeType: 'audio/pcm;rate=16000',
-                    data: parsed.data
-                  }
-                ]
-              }
-            };
-            geminiWs.send(JSON.stringify(realtimeFrame));
-            if (pcmCountReceived % 20 === 1) {
-              console.log(`[MIC STAGE D] Backend forwarded PCM chunk #${pcmCountReceived} to Gemini Live API`);
-            }
-          } else {
-            console.warn(`[MIC STAGE D FAIL] Backend received PCM chunk #${pcmCountReceived} but Gemini WS is not OPEN (state: ${geminiWs?.readyState})`);
+                    data: parsed.data,
+                  },
+                ],
+              },
+            }));
           }
         }
 
-        // B. Patient Transcript / Text Fallback Input
+        // Patient Text or Finalized Voice Utterance
         if (parsed.type === 'user_text' && parsed.text) {
           endOfSpeechTime = Date.now();
           const textInput = parsed.text.trim();
-          console.log(`[MIC STAGE C/D] User text input received at ${endOfSpeechTime}: "${textInput}"`);
+          console.log(`[PATIENT TURN] Session ${sessionId} [${patientLang}]: "${textInput}"`);
 
           session.transcript.push(`Patient: ${textInput}`);
           fullPatientTranscript += ' ' + textInput;
 
-          // Execute Real-Time Independent Red-Flag Safety Net
+          // Real-time Red-Flag Safety Net
           const lowerText = fullPatientTranscript.toLowerCase();
           const triggeredFlags = [];
           for (const rule of redFlagRules) {
@@ -286,41 +239,70 @@ ${langInstruction}
             ws.send(JSON.stringify({ type: 'red_flags', redFlags: triggeredFlags }));
           }
 
-          // Forward user text to Gemini Live session
-          if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
-            console.log(`[QUESTION ORIGIN] Forwarding user text turn to Dynamic Gemini Live session...`);
-            const clientContentFrame = {
-              clientContent: {
-                turns: [
-                  {
-                    role: 'user',
-                    parts: [{ text: textInput }]
-                  }
-                ],
-                turnComplete: true
-              }
-            };
-            geminiWs.send(JSON.stringify(clientContentFrame));
+          // Advance state machine to compute next question in patient's selected language
+          const curQuestion = session.pendingQuestion || { section: isAyush ? 'ayush_intake' : 'chief_complaint', field: 'text' };
+          const result = await stateMachine.submitAnswer(session, curQuestion, textInput);
+          session.pendingQuestion = result.nextQuestion;
+
+          if (result.redFlags && result.redFlags.length > 0) {
+            ws.send(JSON.stringify({ type: 'red_flags', redFlags: result.redFlags }));
+          }
+
+          if (result.sessionComplete || !result.nextQuestion) {
+            // Intake complete message in patient language
+            const closingText = patientLang.startsWith('ta')
+              ? 'மிக்க நன்றி! உங்கள் விவரங்கள் வெற்றிகரமாகப் பதிவு செய்யப்பட்டுள்ளன. ஆவணங்களைப் பதிவேற்றத் தொடரலாம்.'
+              : patientLang.startsWith('hi')
+              ? 'धन्यवाद! आपकी जानकारी सफलतापूर्वक दर्ज कर ली गई है। अब आप अपने दस्तावेज़ अपलोड कर सकते हैं।'
+              : 'Thank you! Your information has been recorded successfully. You may now proceed to document upload.';
+
+            session.transcript.push(`AI: ${closingText}`);
+            session.currentSection = 'done';
+            ws.send(JSON.stringify({ type: 'ai_text_chunk', text: closingText }));
+            ws.send(JSON.stringify({ type: 'turn_complete' }));
+            ws.send(JSON.stringify({ type: 'complete' }));
           } else {
-            console.warn(`[LANGUAGE FALLBACK DETECTED] Gemini WS is CLOSED! QuestionBank fallback would be required.`);
+            const nextText = result.nextQuestion.prompt;
+            session.transcript.push(`AI: ${nextText}`);
+
+            // Send full next question text in the selected language to display in chat!
+            ws.send(JSON.stringify({ type: 'ai_text_chunk', text: nextText }));
+            ws.send(JSON.stringify({ type: 'turn_complete' }));
+
+            // If Gemini WS is active, prompt it with the question to speak in native audio
+            if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
+              geminiWs.send(JSON.stringify({
+                clientContent: {
+                  turns: [
+                    {
+                      role: 'user',
+                      parts: [{ text: `Speak this question politely to the patient: "${nextText}"` }],
+                    },
+                  ],
+                  turnComplete: true,
+                },
+              }));
+            }
           }
         }
 
-        // C. Patient Barge-in / Interruption Event
+        // Interrupted by patient
         if (parsed.type === 'interrupted') {
-          console.log(`[LIVE PROXY] Patient interrupted AI speech in session ${sessionId}`);
+          console.log(`[LIVE PROXY] Patient interrupted in session ${sessionId}`);
         }
 
-        // D. Explicit Finish Interview / Proceed to Documents
+        // Finish interview trigger
         if (parsed.type === 'finish_interview') {
           console.log(`[LIVE PROXY] Finish interview received for session ${sessionId}`);
           session.currentSection = 'done';
+
           if (session.transcript && session.transcript.length > 0) {
             const llm = require('../llm');
             if (typeof llm.extractFullTranscript === 'function') {
               llm.extractFullTranscript({
                 transcript: session.transcript,
                 schema: session.schema,
+                department: session.department,
               }).then((extracted) => {
                 if (extracted) {
                   if (extracted.chief_complaint && !session.schema.chief_complaint.text) {
@@ -335,20 +317,29 @@ ${langInstruction}
                   if (extracted.drug_allergy_history) session.schema.drug_allergy_history_raw = extracted.drug_allergy_history;
                   if (extracted.family_history) session.schema.family_history_raw = extracted.family_history;
                   if (extracted.personal_history) session.schema.personal_history_raw = extracted.personal_history;
+
+                  if (session.schema.ayushAssessment && extracted.ayush_assessment) {
+                    for (const [k, v] of Object.entries(extracted.ayush_assessment)) {
+                      if (v && session.schema.ayushAssessment[k]) {
+                        session.schema.ayushAssessment[k].patientReported = v;
+                      }
+                    }
+                  }
                 }
-              }).catch((e) => console.warn('[liveProxy] Extraction on finish notice:', e.message));
+              }).catch((e) => console.warn('[liveProxy] Extraction notice:', e.message));
             }
           }
+
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'complete' }));
           }
         }
       } catch (err) {
-        console.error('[LIVE PROXY ERROR] Client message handling error:', err.message);
+        console.error('[LIVE PROXY ERROR] Message handling error:', err.message);
       }
     });
 
-    ws.on('close', (code, reason) => {
+    ws.on('close', (code) => {
       console.log(`[WEBSOCKET STABILITY] Client WS closed for session ${sessionId}. Code: ${code}`);
       if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
         geminiWs.close();

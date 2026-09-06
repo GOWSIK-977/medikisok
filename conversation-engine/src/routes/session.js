@@ -60,6 +60,7 @@ router.post('/:id/finalize', (req, res) => {
         llm.extractFullTranscript({
           transcript: session.transcript,
           schema: session.schema,
+          department: session.department,
         }).then((extracted) => {
           if (extracted) {
             if (extracted.chief_complaint && !session.schema.chief_complaint.text) {
@@ -74,6 +75,14 @@ router.post('/:id/finalize', (req, res) => {
             if (extracted.drug_allergy_history) session.schema.drug_allergy_history_raw = extracted.drug_allergy_history;
             if (extracted.family_history) session.schema.family_history_raw = extracted.family_history;
             if (extracted.personal_history) session.schema.personal_history_raw = extracted.personal_history;
+
+            if (session.schema.ayushAssessment && extracted.ayush_assessment) {
+              for (const [k, v] of Object.entries(extracted.ayush_assessment)) {
+                if (v && session.schema.ayushAssessment[k]) {
+                  session.schema.ayushAssessment[k].patientReported = v;
+                }
+              }
+            }
           }
         }).catch((err) => {
           console.warn('[session finalize] Background extraction error:', err.message);

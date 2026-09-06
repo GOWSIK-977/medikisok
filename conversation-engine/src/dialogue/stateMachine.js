@@ -14,11 +14,17 @@ const SECTION_ORDER = [
   'personal_history',
 ];
 
-function firstQuestion() {
+function firstQuestion(session) {
+  const lang = session?.schema?.patient?.preferred_language || session?.language || 'en';
+  if (session && session.department === 'AYUSH') {
+    session.currentSection = 'ayush_intake';
+    session.ayushIndex = 0;
+    return nextAyushQuestion(session);
+  }
   return {
     section: 'chief_complaint',
     field: 'text',
-    prompt: 'What is the main problem that brought you in today?',
+    prompt: qb.getGeneralMedicineInitialQuestion(lang),
   };
 }
 
@@ -27,12 +33,19 @@ function firstQuestion() {
  * Returns null when the interview is complete.
  */
 function computeNextQuestion(session) {
+  if (session.currentSection === 'ayush_intake' || session.currentSection === 'ayush_dashavidha_pariksha') {
+    const q = nextAyushQuestion(session);
+    if (q) return q;
+    session.currentSection = 'done';
+    return null;
+  }
+
   const sectionIdx = SECTION_ORDER.indexOf(session.currentSection);
 
   if (session.currentSection === 'chief_complaint') {
     // Chief complaint just answered -> move into HPI, using the detected
     // complaint category to pick the SOCRATES field order.
-    session.complaintCategory = qb.detectComplaintCategory(session.schema.chief_complaint.text_en);
+    session.complaintCategory = qb.detectComplaintCategory(session.schema.chief_complaint.text_en || session.schema.chief_complaint.text);
     session.hpiFieldOrder = qb.getHpiFieldOrder(session.complaintCategory);
     session.hpiFieldIndex = 0;
     session.currentSection = 'hpi';
@@ -54,13 +67,6 @@ function computeNextQuestion(session) {
     return advanceToNextGenericSection(session, sectionIdx);
   }
 
-  if (session.currentSection === 'ayush_dashavidha_pariksha') {
-    const q = nextAyushQuestion(session);
-    if (q) return q;
-    session.currentSection = 'done';
-    return null;
-  }
-
   // Generic single-question sections (past medical, surgical, drug/allergy, family, personal)
   if (['past_medical_history', 'past_surgical_history', 'drug_allergy_history', 'family_history', 'personal_history'].includes(session.currentSection)) {
     return advanceToNextGenericSection(session, sectionIdx);
@@ -70,40 +76,53 @@ function computeNextQuestion(session) {
 }
 
 function nextAyushQuestion(session) {
-  const questions = qb.AYUSH_DASHAVIDHA_QUESTIONS;
+  const questions = qb.AYUSH_INTAKE_QUESTIONS;
   if (!questions || session.ayushIndex >= questions.length) return null;
   const q = questions[session.ayushIndex];
+  const lang = session.schema?.patient?.preferred_language || session.language || 'en';
   return {
-    section: 'ayush_dashavidha_pariksha',
+    section: 'ayush_intake',
     field: q.field,
-    prompt: q.prompt,
+    ayushField: q.ayushField,
+    domainLabel: q.domainLabel,
+    prompt: qb.getAyushQuestionPrompt(q, lang),
     options: q.options,
+    category: q.category,
+    step: session.ayushIndex + 1,
+    totalSteps: questions.length,
   };
 }
 
 function nextHpiQuestion(session) {
   const fields = session.hpiFieldOrder;
-  if (session.hpiFieldIndex >= fields.length) return null;
+  if (!fields || session.hpiFieldIndex >= fields.length) return null;
   const field = fields[session.hpiFieldIndex];
+  const lang = session.schema?.patient?.preferred_language || session.language || 'en';
   return {
     section: 'hpi',
     field,
-    prompt: qb.SOCRATES_TEMPLATES[field],
+    prompt: qb.getHpiQuestionPrompt(field, lang),
   };
 }
 
 function nextRosQuestion(session) {
   const questions = qb.ROS_QUESTIONS;
-  if (session.rosIndex >= questions.length) return null;
-  const { system, question } = questions[session.rosIndex];
-  return { section: 'review_of_systems', field: system, prompt: question };
+  if (!questions || session.rosIndex >= questions.length) return null;
+  const rosItem = questions[session.rosIndex];
+  const lang = session.schema?.patient?.preferred_language || session.language || 'en';
+  return {
+    section: 'review_of_systems',
+    field: rosItem.system,
+    prompt: qb.getRosQuestionPrompt(rosItem, lang),
+  };
 }
 
 function advanceToNextGenericSection(session, currentIdx) {
   const nextIdx = currentIdx + 1;
   if (nextIdx >= SECTION_ORDER.length) {
     if (session.department === 'AYUSH') {
-      session.currentSection = 'ayush_dashavidha_pariksha';
+      session.currentSection = 'ayush_intake';
+      session.ayushIndex = 0;
       return nextAyushQuestion(session);
     }
     session.currentSection = 'done';
@@ -117,11 +136,9 @@ function advanceToNextGenericSection(session, currentIdx) {
     return nextRosQuestion(session);
   }
 
-  const prompts = qb.HISTORY_SECTIONS[nextSection];
-  if (prompts) {
-    return { section: nextSection, field: 'text', prompt: prompts[0] };
-  }
-  return advanceToNextGenericSection(session, nextIdx);
+  const lang = session.schema?.patient?.preferred_language || session.language || 'en';
+  const prompt = qb.getHistorySectionPrompt(nextSection, lang);
+  return { section: nextSection, field: 'text', prompt };
 }
 
 /**
@@ -129,14 +146,50 @@ function advanceToNextGenericSection(session, currentIdx) {
  * run red-flag detection, and compute the next question.
  */
 async function submitAnswer(session, currentQuestion, rawAnswerText) {
-  session.transcript.push(rawAnswerText);
+  session.transcript.push(`Patient: ${rawAnswerText}`);
 
-  // If in AYUSH Dashavidha section, store patientReported answer directly and move to next AYUSH question
-  if (session.currentSection === 'ayush_dashavidha_pariksha') {
+  // If in AYUSH Intake section, map patient natural answer into structured AYUSH fields
+  if (session.currentSection === 'ayush_intake' || session.currentSection === 'ayush_dashavidha_pariksha') {
     const field = currentQuestion.field;
-    if (session.schema.ayushAssessment && session.schema.ayushAssessment[field]) {
-      session.schema.ayushAssessment[field].patientReported = rawAnswerText;
+    const ayushField = currentQuestion.ayushField || field;
+
+    if (session.schema.ayushAssessment) {
+      if (session.schema.ayushAssessment[ayushField]) {
+        session.schema.ayushAssessment[ayushField].patientReported = rawAnswerText;
+      }
+      // Cross-mappings to complete the 10-fold Dashavidha and digestive/bowel profiles
+      if (field === 'hunger_digestion') {
+        if (session.schema.ayushAssessment.agni) session.schema.ayushAssessment.agni.patientReported = rawAnswerText;
+        if (session.schema.ayushAssessment.ahara_shakti) session.schema.ayushAssessment.ahara_shakti.patientReported = rawAnswerText;
+      }
+      if (field === 'bowel_habits') {
+        if (session.schema.ayushAssessment.koshtha) session.schema.ayushAssessment.koshtha.patientReported = rawAnswerText;
+      }
+      if (field === 'exercise_strength') {
+        if (session.schema.ayushAssessment.vyayama_shakti) session.schema.ayushAssessment.vyayama_shakti.patientReported = rawAnswerText;
+        if (session.schema.ayushAssessment.sara) session.schema.ayushAssessment.sara.patientReported = rawAnswerText;
+      }
+      if (field === 'body_build') {
+        if (session.schema.ayushAssessment.samhanana) session.schema.ayushAssessment.samhanana.patientReported = rawAnswerText;
+        if (session.schema.ayushAssessment.pramana) session.schema.ayushAssessment.pramana.patientReported = rawAnswerText;
+      }
     }
+
+    // General medical mappings
+    if (field === 'current_symptoms' || ayushField === 'vikriti') {
+      session.schema.chief_complaint.text = rawAnswerText;
+      session.schema.chief_complaint.text_en = rawAnswerText;
+    }
+    if (field === 'general_medical_history') {
+      session.schema.past_medical_history_raw = rawAnswerText;
+    }
+    if (field === 'food_habits') {
+      session.schema.personal_history_raw = (session.schema.personal_history_raw ? session.schema.personal_history_raw + '; ' : '') + 'Diet: ' + rawAnswerText;
+    }
+    if (field === 'lifestyle_habits') {
+      session.schema.personal_history_raw = (session.schema.personal_history_raw ? session.schema.personal_history_raw + '; ' : '') + 'Habits: ' + rawAnswerText;
+    }
+
     session.ayushIndex = (session.ayushIndex || 0) + 1;
     const nextQ = computeNextQuestion(session);
 

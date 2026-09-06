@@ -59,4 +59,17 @@ async function detectRedFlag({ transcript }) {
   return triggered;
 }
 
-module.exports = { extractStructuredAnswer, rephraseQuestion, detectRedFlag };
+async function extractFullTranscript({ transcript, schema = {} }) {
+  const fullText = (transcript || []).join('\n');
+  return {
+    chief_complaint: schema?.chief_complaint?.text || 'Reported symptom intake',
+    hpi: schema?.hpi || {},
+    past_medical_history: schema?.past_medical_history_raw || null,
+    past_surgical_history: schema?.past_surgical_history_raw || null,
+    drug_allergy_history: schema?.drug_allergy_history_raw || null,
+    family_history: schema?.family_history_raw || null,
+    personal_history: schema?.personal_history_raw || null,
+  };
+}
+
+module.exports = { extractStructuredAnswer, rephraseQuestion, detectRedFlag, extractFullTranscript };
