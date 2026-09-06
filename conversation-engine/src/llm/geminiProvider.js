@@ -15,7 +15,7 @@ if (apiKey) {
   console.warn('[geminiProvider] Warning: GEMINI_API_KEY is not set. Gemini calls will fall back gracefully.');
 }
 
-const MODEL_NAME = 'gemini-2.0-flash';
+const MODEL_NAME = 'gemini-3.6-flash';
 
 /**
  * Robust caller with exponential retry for temporary Google API 503 / 429 spikes.

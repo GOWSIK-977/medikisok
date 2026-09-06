@@ -4,7 +4,43 @@
  * highly structured reports for General Medicine OPD vs AYUSH OPD.
  */
 
-async function generateSummaryText({ clinicalHistory, documents, documentAlerts = [], language = 'en' }) {
+function formatPreviousDocuments(documents) {
+  if (!documents || documents.length === 0) return '';
+  let text = '\n\nPREVIOUS PRESCRIPTIONS & UPLOADED MEDICAL DOCUMENTS (AI ANALYSIS):\n';
+  for (const doc of documents) {
+    const isRx = (doc.document_type || doc.documentType) === 'prescription';
+    const typeLabel = isRx ? 'Previous Prescription' : (doc.document_type || doc.documentType) === 'lab_report' ? 'Previous Lab Report' : 'Discharge Summary';
+    const docDate = doc.document_date || 'Recent';
+    const doctorStr = doc.doctor_name
+      ? `${doc.doctor_name}${doc.doctor_specialty ? ' (' + doc.doctor_specialty + ')' : ''}${doc.clinic_or_hospital ? ', ' + doc.clinic_or_hospital : ''}`
+      : (isRx ? 'Consultant Rheumatology / OPD Physician' : 'Diagnostic Center / Hospital');
+
+    text += `• Document: ${typeLabel} (${docDate})\n`;
+    text += `• Prescribing Doctor / Facility: ${doctorStr}\n`;
+
+    if (doc.short_description) {
+      text += `• AI Clinical Synopsis: ${doc.short_description}\n`;
+    }
+
+    if (doc.extracted_diagnoses && doc.extracted_diagnoses.length > 0) {
+      text += `• Identified Diagnoses / Impressions: ${doc.extracted_diagnoses.join(', ')}\n`;
+    }
+
+    if (doc.extracted_medications && doc.extracted_medications.length > 0) {
+      const medList = doc.extracted_medications
+        .map((m) => `${m.name}${m.dosage ? ' ' + m.dosage : ''}${m.frequency ? ' - ' + m.frequency : ''}${m.instructions ? ' (' + m.instructions + ')' : ''}`)
+        .join('; ');
+      text += `• Previous Prescribed Regimen: ${medList}\n`;
+    }
+
+    if (doc.advice) {
+      text += `• Physician Advice / Non-Pharmacological: ${doc.advice}\n`;
+    }
+  }
+  return text;
+}
+
+async function generateSummaryText({ clinicalHistory, documents = [], documentAlerts = [], language = 'en' }) {
   const patient = clinicalHistory?.patient || {};
   const cc = clinicalHistory?.chief_complaint?.text || clinicalHistory?.chief_complaint?.text_en || 'Not specified';
   const hpi = clinicalHistory?.hpi || {};
@@ -17,6 +53,7 @@ async function generateSummaryText({ clinicalHistory, documents, documentAlerts 
   const allergies = clinicalHistory?.drug_allergy_history?.allergies || [];
 
   const isAyush = clinicalHistory?.department === 'AYUSH';
+  const previousDocsBlock = formatPreviousDocuments(documents);
 
   let summary = '';
 
@@ -63,6 +100,7 @@ PURVA VYADHI & AUSHADHI (PAST ILLNESSES & MEDICATIONS):
 • Past Medical History: ${pmh.length > 0 ? pmh.map((m) => m.condition || m).join(', ') : 'No chronic illness reported'}
 • Current Medications: ${meds.length > 0 ? meds.map((m) => `${m.name} ${m.dosage || ''}`).join(', ') : 'None reported'}
 • Asatmya / Allergies: ${allergies.length > 0 ? allergies.map((a) => a).join(', ') : 'No known drug or food allergies'}
+${previousDocsBlock}
 
 ATYAYIKA AVASTHA (EMERGENCY RED FLAGS):
 • ${redFlags.length > 0 ? redFlags.map((f) => `🚨 ${f.flag} (${f.severity || 'critical'})`).join('; ') : 'None detected - Patient hemodynamically stable'}
@@ -107,6 +145,7 @@ PAST MEDICAL & SURGICAL HISTORY:
 CURRENT MEDICATIONS & ALLERGIES:
 • Current Medications: ${meds.length > 0 ? meds.map((m) => `• ${m.name} ${m.dosage || ''}`).join('\n') : '• None reported'}
 • Drug / Food Allergies: ${allergies.length > 0 ? allergies.map((a) => `• ${a}`).join('\n') : '• No known allergies reported'}
+${previousDocsBlock}
 
 EMERGENCY RED FLAGS & TRIAGE ALERTS:
 • ${redFlags.length > 0 ? redFlags.map((f) => `🚨 ${f.flag} (${f.severity || 'critical'})`).join('\n• ') : 'None detected - Hemodynamically stable'}
@@ -138,6 +177,15 @@ async function translateSummaryText({ summaryText, targetLanguage }) {
     const translated = summaryText
       .replace(/GENERAL MEDICINE CLINICAL OPD SUMMARY & TRIAGE REPORT/g, 'सामान्य चिकित्सा क्लिनिकल ओपीडी सारांश और ट्राइएज रिपोर्ट')
       .replace(/AYUSH CLINICAL OPD - ROGA ITIHASA & PARIKSHA REPORT/g, 'आयुष क्लिनिकल ओपीडी - रोग इतिहास एवं परीक्षा रिपोर्ट')
+      .replace(/PREVIOUS PRESCRIPTIONS & UPLOADED MEDICAL DOCUMENTS \(AI ANALYSIS\):/g, 'पिछली पर्चियां और अपलोड किए गए मेडिकल दस्तावेज़ (AI विश्लेषण):')
+      .replace(/• Document: Previous Prescription/g, '• दस्तावेज़: पिछली डॉक्टर पर्ची')
+      .replace(/• Document: Previous Lab Report/g, '• दस्तावेज़: पिछली लैब रिपोर्ट')
+      .replace(/• Document: Discharge Summary/g, '• दस्तावेज़: डिस्चार्ज सारांश')
+      .replace(/• Prescribing Doctor \/ Facility:/g, '• परामर्शदाता चिकित्सक / अस्पताल:')
+      .replace(/• AI Clinical Synopsis:/g, '• AI नैदानिक संक्षिप्त विवरण (Short Description):')
+      .replace(/• Previous Prescribed Regimen:/g, '• पूर्व निर्धारित दवाएं एवं खुराक:')
+      .replace(/• Identified Diagnoses \/ Impressions:/g, '• पहचानी गई बीमारियाँ / नैदानिक निष्कर्ष:')
+      .replace(/• Physician Advice \/ Non-Pharmacological:/g, '• डॉक्टर की सलाह एवं सावधानियां:')
       .replace(/PATIENT DEMOGRAPHICS:/g, 'मरीज का विवरण:')
       .replace(/ROGI VIVARANA \(PATIENT DEMOGRAPHICS\):/g, 'रोगी विवरण (मरीज की जनसांख्यिकी):')
       .replace(/Rogi \(Patient Name\):/g, 'रोगी का नाम:')
@@ -205,6 +253,15 @@ async function translateSummaryText({ summaryText, targetLanguage }) {
     const translated = summaryText
       .replace(/GENERAL MEDICINE CLINICAL OPD SUMMARY & TRIAGE REPORT/g, 'பொது மருத்துவ மருத்துவமனை OPD சுருக்கம் மற்றும் ட்ரையேஜ் அறிக்கை')
       .replace(/AYUSH CLINICAL OPD - ROGA ITIHASA & PARIKSHA REPORT/g, 'ஆயுஷ் மருத்துவமனை OPD - நோய் வரலாறு மற்றும் பரிசோதனை அறிக்கை')
+      .replace(/PREVIOUS PRESCRIPTIONS & UPLOADED MEDICAL DOCUMENTS \(AI ANALYSIS\):/g, 'முந்தைய மருந்துக் குறிப்புகள் & மருத்துவ ஆவணங்கள் (AI பகுப்பாய்வு):')
+      .replace(/• Document: Previous Prescription/g, '• ஆவணம்: முந்தைய மருத்துவர் மருந்துச் சீட்டு')
+      .replace(/• Document: Previous Lab Report/g, '• ஆவணம்: முந்தைய பரிசோதனை அறிக்கை')
+      .replace(/• Document: Discharge Summary/g, '• ஆவணம்: டிஸ்சார்ஜ் சுருக்கம்')
+      .replace(/• Prescribing Doctor \/ Facility:/g, '• பரிந்துரைத்த மருத்துவர் / மருத்துவமனை:')
+      .replace(/• AI Clinical Synopsis:/g, '• AI மருத்துவ சுருக்கம் (Short Description):')
+      .replace(/• Previous Prescribed Regimen:/g, '• முந்தைய பரிந்துரைக்கப்பட்ட மருந்துகள்:')
+      .replace(/• Identified Diagnoses \/ Impressions:/g, '• கண்டறியப்பட்ட நோய் / மருத்துவ கணிப்பு:')
+      .replace(/• Physician Advice \/ Non-Pharmacological:/g, '• மருத்துவரின் ஆலோசனைகள்:')
       .replace(/PATIENT DEMOGRAPHICS:/g, 'நோயாளி விவரங்கள்:')
       .replace(/ROGI VIVARANA \(PATIENT DEMOGRAPHICS\):/g, 'நோயாளி விவரங்கள் (Rogi Vivarana):')
       .replace(/Rogi \(Patient Name\):/g, 'நோயாளி பெயர்:')
@@ -272,3 +329,4 @@ async function translateSummaryText({ summaryText, targetLanguage }) {
 }
 
 module.exports = { generateSummaryText, translateSummaryText };
+

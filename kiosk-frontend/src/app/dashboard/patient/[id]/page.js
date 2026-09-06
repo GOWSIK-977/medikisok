@@ -321,6 +321,7 @@ export default function PatientDetailPage() {
   const [showFhir, setShowFhir] = useState(false);
   const [summaryLang, setSummaryLang] = useState("en");
   const [langCache, setLangCache] = useState({});
+  const [expandedOcr, setExpandedOcr] = useState({});
 
   useEffect(() => {
     load();
@@ -862,18 +863,200 @@ export default function PatientDetailPage() {
         </div>
       )}
 
+      {/* PREVIOUS PRESCRIPTIONS & MEDICAL DOCUMENTS CLINICAL ANALYSIS */}
       {documents?.length > 0 && (
-        <Section
-          sectionKey="documents"
-          defaultTitle="Extracted Documents"
-          data={documents.map((d) => ({
-            type: d.documentType || d.type,
-            date: d.date,
-            findings: d.extractedText ? undefined : d,
-          }))}
-          lang={summaryLang}
-        />
+        <div className="card" style={{ marginBottom: 20, border: "1.5px solid #38bdf8", background: "#f0f9ff" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 20 }}>📋</span>
+              <h3 style={{ margin: 0, fontSize: 18, color: "#0369a1" }}>
+                PREVIOUS PRESCRIPTIONS & DOCUMENT CLINICAL ANALYSIS
+              </h3>
+            </div>
+            <span style={{ background: "#bae6fd", color: "#0369a1", padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 700 }}>
+              {documents.length} Document{documents.length > 1 ? "s" : ""} Analyzed
+            </span>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {documents.map((doc, idx) => {
+              const isRx = (doc.document_type || doc.documentType) === "prescription";
+              const isExpanded = !!expandedOcr[doc.document_id || idx];
+              return (
+                <div
+                  key={doc.document_id || idx}
+                  style={{
+                    background: "#ffffff",
+                    borderRadius: 12,
+                    padding: 18,
+                    border: "1px solid #e0f2fe",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: "#0c4a6e" }}>
+                          {isRx ? "💊 Previous Doctor Prescription" : (doc.document_type || doc.documentType) === "lab_report" ? "🧪 Diagnostic Lab Report" : "🏥 Hospital Discharge Summary"}
+                        </span>
+                        {doc.document_date && (
+                          <span style={{ fontSize: 12, background: "#f1f5f9", color: "#475569", padding: "2px 8px", borderRadius: 6 }}>
+                            📅 {doc.document_date}
+                          </span>
+                        )}
+                      </div>
+                      {(doc.doctor_name || doc.clinic_or_hospital) && (
+                        <p style={{ margin: "4px 0 0", fontSize: 13.5, color: "#0284c7", fontWeight: 600 }}>
+                          👨‍⚕️ {doc.doctor_name || "Physician"}
+                          {doc.doctor_specialty && ` (${doc.doctor_specialty})`}
+                          {doc.clinic_or_hospital && ` • ${doc.clinic_or_hospital}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* AI Clinical Synopsis / Short Description */}
+                  {doc.short_description && (
+                    <div
+                      style={{
+                        background: "#eff6ff",
+                        border: "1px solid #bfdbfe",
+                        borderRadius: 10,
+                        padding: "12px 14px",
+                        marginBottom: 14,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#1d4ed8", fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
+                        🧠 AI Clinical Synopsis / Previous Prescription Summary:
+                      </div>
+                      <p style={{ margin: 0, fontSize: 14, color: "#1e3a8a", lineHeight: 1.55 }}>
+                        {doc.short_description}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Identified Diagnoses / Impressions */}
+                  {doc.extracted_diagnoses?.length > 0 && (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 12, color: "var(--slate)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                        Identified Diagnoses / Clinical Findings
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {doc.extracted_diagnoses.map((dx, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              background: "#fef3c7",
+                              color: "#92400e",
+                              padding: "4px 10px",
+                              borderRadius: 8,
+                              fontSize: 12.5,
+                              fontWeight: 600,
+                              border: "1px solid #fde68a",
+                            }}
+                          >
+                            🩺 {dx}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Extracted Medications Table */}
+                  {doc.extracted_medications?.length > 0 && (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 12, color: "var(--slate)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                        Previous Prescribed Medications
+                      </div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                          <thead>
+                            <tr style={{ background: "#f8fafc", textAlign: "left", color: "#475569", borderBottom: "1px solid #e2e8f0" }}>
+                              <th style={{ padding: "8px 10px", width: "35%" }}>Medication Name</th>
+                              <th style={{ padding: "8px 10px", width: "18%" }}>Dosage</th>
+                              <th style={{ padding: "8px 10px", width: "22%" }}>Frequency / Timing</th>
+                              <th style={{ padding: "8px 10px", width: "25%" }}>Clinical Instructions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {doc.extracted_medications.map((m, i) => (
+                              <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                <td style={{ padding: "8px 10px", fontWeight: 600, color: "#0f172a" }}>
+                                  💊 {m.name}
+                                </td>
+                                <td style={{ padding: "8px 10px", color: "#334155" }}>
+                                  {m.dosage || "—"}
+                                </td>
+                                <td style={{ padding: "8px 10px", color: "#334155" }}>
+                                  {m.frequency || "As directed"}
+                                </td>
+                                <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 12.5 }}>
+                                  {m.instructions || "Standard prescription"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Physician Advice & Instructions */}
+                  {doc.advice && (
+                    <div style={{ background: "#f8fafc", padding: "10px 12px", borderRadius: 8, fontSize: 13, color: "#334155", marginBottom: 12 }}>
+                      <strong>📝 Advice & Follow-up:</strong> {doc.advice}
+                    </div>
+                  )}
+
+                  {/* Toggle Raw OCR Text */}
+                  {doc.raw_ocr_text && (
+                    <div style={{ marginTop: 8 }}>
+                      <button
+                        type="button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#0284c7",
+                          fontSize: 12.5,
+                          cursor: "pointer",
+                          padding: 0,
+                          textDecoration: "underline",
+                        }}
+                        onClick={() =>
+                          setExpandedOcr((prev) => ({
+                            ...prev,
+                            [doc.document_id || idx]: !prev[doc.document_id || idx],
+                          }))
+                        }
+                      >
+                        {isExpanded ? "▲ Hide Raw Handwritten OCR Text" : "▼ View Raw Handwritten OCR Transcription"}
+                      </button>
+                      {isExpanded && (
+                        <pre
+                          style={{
+                            marginTop: 8,
+                            padding: 12,
+                            background: "#f1f5f9",
+                            borderRadius: 8,
+                            fontSize: 12,
+                            whiteSpace: "pre-wrap",
+                            fontFamily: "var(--font-mono)",
+                            color: "#334155",
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {doc.raw_ocr_text}
+                        </pre>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
+
 
       <div className="card" style={{ marginBottom: 20 }}>
         {SECTION_KEYS.map(([key, label]) => (

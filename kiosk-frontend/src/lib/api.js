@@ -66,10 +66,10 @@ export function finalizeSession(sessionId) {
 
 // ---- Person 2: Document Engine ----
 
-export function uploadDocument(sessionId, documentType, imageBase64) {
+export function uploadDocument(sessionId, documentType, imageBase64, patientName) {
   return request(`${DOCS}/api/documents/${sessionId}/upload`, {
     method: "POST",
-    body: JSON.stringify({ documentType, imageBase64 }),
+    body: JSON.stringify({ documentType, imageBase64, patientName }),
   });
 }
 

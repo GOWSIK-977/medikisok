@@ -15,7 +15,7 @@ if (apiKey) {
   console.warn('[document-engine geminiProvider] Warning: GEMINI_API_KEY not set.');
 }
 
-const MODEL_NAME = 'gemini-2.0-flash';
+const MODEL_NAME = 'gemini-3.6-flash';
 
 /**
  * Robust caller with exponential retry for temporary Google API 503 / 429 spikes.
@@ -109,6 +109,16 @@ PURVA VYADHI & AUSHADHI (PAST ILLNESSES & MEDICATIONS):
 • Current Medications: <Medications or "None reported">
 • Asatmya / Allergies: <Allergies or "No known allergies">
 
+PREVIOUS PRESCRIPTIONS & MEDICAL DOCUMENTS (ANALYSIS):
+<If documents or prescriptions were uploaded, provide:
+• Document: <Type> (<Date>)
+• Prescribing Doctor / Facility: <Doctor Name, Qualifications, Clinic/Hospital>
+• AI Clinical Synopsis: <Concise 2-3 sentence short description of what was prescribed, for what conditions, and key instructions>
+• Previous Prescribed Regimen: <List of previous medications with dosage & frequency>
+• Clinical Findings / Diagnoses: <Previous diagnoses>
+• Physician Advice: <Advice if any>
+If no documents uploaded, state "• No previous medical documents uploaded">
+
 ATYAYIKA AVASTHA (EMERGENCY RED FLAGS):
 • <Red flags with 🚨 or "None detected - Patient stable">
 
@@ -155,6 +165,16 @@ PAST MEDICAL & SURGICAL HISTORY:
 CURRENT MEDICATIONS & ALLERGIES:
 • Current Medications: <Medications or "None reported">
 • Drug / Food Allergies: <Allergies or "No known allergies reported">
+
+PREVIOUS PRESCRIPTIONS & MEDICAL DOCUMENTS (ANALYSIS):
+<If documents or prescriptions were uploaded, provide:
+• Document: <Type> (<Date>)
+• Prescribing Doctor / Facility: <Doctor Name, Qualifications, Clinic/Hospital>
+• AI Clinical Synopsis: <Concise 2-3 sentence short description of what was prescribed, for what conditions, and key instructions>
+• Previous Prescribed Regimen: <List of previous medications with dosage & frequency>
+• Clinical Findings / Diagnoses: <Previous diagnoses>
+• Physician Advice: <Advice if any>
+If no documents uploaded, state "• No previous medical documents uploaded">
 
 EMERGENCY RED FLAGS & TRIAGE ALERTS:
 • <Red flags with 🚨 or "None detected - Hemodynamically stable">
