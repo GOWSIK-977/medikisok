@@ -34,6 +34,7 @@ async function generateContentWithRetry(prompt, retries = 2, delayMs = 700) {
         err.message?.includes('503') ||
         err.message?.includes('429') ||
         err.message?.includes('demand') ||
+        err.message?.includes('overloaded') ||
         err.message?.includes('UNAVAILABLE') ||
         err.message?.includes('RESOURCE_EXHAUSTED');
 
@@ -42,7 +43,8 @@ async function generateContentWithRetry(prompt, retries = 2, delayMs = 700) {
         await new Promise((r) => setTimeout(r, delayMs * Math.pow(1.5, attempt)));
         continue;
       }
-      throw err;
+      console.warn('[document-engine geminiProvider] Gemini API unavailable or overloaded, falling back gracefully:', err.message);
+      return null;
     }
   }
   return null;
